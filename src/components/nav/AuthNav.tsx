@@ -4,8 +4,14 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
-export function AuthNav() {
-  const [displayName, setDisplayName] = useState<string | null | undefined>(undefined); // undefined = still loading
+type InitialUser = { id: string; displayName: string } | null;
+
+export function AuthNav({ initialUser }: { initialUser: InitialUser }) {
+  // Fixes Bug 3: Instantly renders the server-provided identity to avoid navigation flashes
+  const [displayName, setDisplayName] = useState<string | null>(
+    initialUser ? initialUser.displayName : null
+  );
+  const [signedIn, setSignedIn] = useState(initialUser !== null);
   const [unreadCount, setUnreadCount] = useState(0);
   const supabase = createClient();
 
@@ -13,9 +19,12 @@ export function AuthNav() {
     async function loadProfile() {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData?.user) {
+        setSignedIn(false);
         setDisplayName(null);
         return;
       }
+      setSignedIn(true);
+      
       const { data: profile } = await supabase
         .from('profiles')
         .select('display_name')
@@ -41,11 +50,7 @@ export function AuthNav() {
     window.location.href = '/';
   }
 
-  if (displayName === undefined) {
-    return <span className="text-sm text-paper-200/50">…</span>;
-  }
-
-  if (displayName === null) {
+  if (!signedIn) {
     return (
       <Link href="/sign-in" className="hover:text-amber-500">
         Sign in

@@ -1,12 +1,34 @@
 import Link from 'next/link';
 import { AuthNav } from '@/components/nav/AuthNav';
+import { createClient } from '@/lib/supabase/server';
 
 // Design direction: a departmental archive, not a generic SaaS landing page.
 // Dark ink-blue ground (a reading room at night) with paper-toned catalog
 // cards laid on top — course codes get a stamped, monospace treatment since
 // they function as real catalog identifiers here, not decoration.
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  
+  let initialUser: { id: string; displayName: string } | null = null;
+
+  if (userData?.user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('display_name')
+      .eq('id', userData.user.id)
+      .single();
+      
+    initialUser = { 
+      id: userData.user.id, 
+      displayName: profile?.display_name ?? userData.user.email ?? 'Account' 
+    };
+  }
+
+  // Fixes Bug 1: Redirects to upload form if logged in, otherwise to sign-in page
+  const contributeHref = userData?.user ? '/uploads/new' : '/sign-in';
+
   return (
     <main className="min-h-screen bg-ink-950 text-paper-50">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
@@ -17,7 +39,7 @@ export default function HomePage() {
           <Link href="/search" className="hover:text-amber-500">
             Search
           </Link>
-          <AuthNav />
+          <AuthNav initialUser={initialUser} />
         </nav>
       </header>
 
@@ -39,7 +61,7 @@ export default function HomePage() {
               Browse by department
             </Link>
             <Link
-              href="/sign-in"
+              href={contributeHref}
               className="rounded-sm border border-paper-200/30 px-5 py-3 text-sm font-medium hover:border-paper-200/60"
             >
               Contribute a resource
