@@ -13,9 +13,12 @@ type Notification = {
   created_at: string;
 };
 
+// In NotificationsList.tsx
 const TYPE_LABEL: Record<string, string> = {
   upload_approved: 'Approved',
   upload_rejected: 'Rejected',
+  course_approved: 'Course approved',
+  course_rejected: 'Course rejected',
 };
 
 export default function NotificationsList({ userId }: { userId: string }) {
