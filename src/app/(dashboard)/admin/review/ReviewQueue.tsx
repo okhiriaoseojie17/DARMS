@@ -29,23 +29,11 @@ export default function ReviewQueue({ userId }: { userId: string }) {
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadQueue() {
-    // Fixed: the previous version filtered on an embedded table via
-    // `.in('permissions.key', [...])`, which is fragile PostgREST syntax and
-    // can silently return zero rows. Fetching the join plainly and filtering
-    // in JS instead — guaranteed to behave the same regardless of
-    // supabase-js/PostgREST version quirks.
-    const { data: perms, error: permsError } = await supabase
-  .from('permission_assignments')
-  .select('revoked_at, permissions(key)')
-  .eq('profile_id', userId);
+    const { data: perms } = await supabase
+      .from('permission_assignments')
+      .select('revoked_at, permissions(key)')
+      .eq('profile_id', userId);
 
-console.log('perms:', JSON.stringify(perms), 'error:', permsError);
-    // NOTE: PostgREST embeds a plain many-to-one relation (permission_id ->
-    // permissions.id) as an ARRAY, not a single object, unless the FK is
-    // explicitly marked one-to-one. So `row.permissions` here is
-    // `[{ key: '...' }]`, not `{ key: '...' }` — reading `.key` directly off
-    // it was always `undefined`, which made detectedAccess permanently false
-    // regardless of what was actually granted in the database.
     const detectedAccess = (perms ?? []).some((row: any) => {
       const permsForRow = Array.isArray(row.permissions) ? row.permissions : [row.permissions];
       return (
@@ -94,6 +82,14 @@ console.log('perms:', JSON.stringify(perms), 'error:', permsError);
     const data = await res.json();
     setBusyId(null);
 
+    // Treat 207 Multi-Status as a warning, not a full success — the status
+    // update went through but the file move to the approved bucket failed,
+    // so the download link would 404 if we silently treated this as clean.
+    if (res.status === 207) {
+      setMessage(data.warning ?? 'Approved, but the file move failed — check storage.');
+      setUploads((prev) => prev.filter((u) => u.id !== id));
+      return;
+    }
     if (!res.ok) {
       setMessage(data.error ?? 'Approval failed.');
       return;
