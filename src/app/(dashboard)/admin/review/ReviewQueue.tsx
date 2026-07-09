@@ -34,11 +34,12 @@ export default function ReviewQueue({ userId }: { userId: string }) {
     // can silently return zero rows. Fetching the join plainly and filtering
     // in JS instead — guaranteed to behave the same regardless of
     // supabase-js/PostgREST version quirks.
-    const { data: perms } = await supabase
-      .from('permission_assignments')
-      .select('revoked_at, permissions(key)')
-      .eq('profile_id', userId);
+    const { data: perms, error: permsError } = await supabase
+  .from('permission_assignments')
+  .select('revoked_at, permissions(key)')
+  .eq('profile_id', userId);
 
+console.log('perms:', JSON.stringify(perms), 'error:', permsError);
     // NOTE: PostgREST embeds a plain many-to-one relation (permission_id ->
     // permissions.id) as an ARRAY, not a single object, unless the FK is
     // explicitly marked one-to-one. So `row.permissions` here is
