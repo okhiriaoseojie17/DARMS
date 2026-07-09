@@ -8,7 +8,16 @@ import { BackLink } from '@/components/nav/BackLink';
 type Notification = {
   id: string;
   type: string;
-  payload: { uploadId?: string; filename?: string; courseId?: string; reason?: string };
+  payload: {
+    uploadId?: string;
+    filename?: string;
+    courseId?: string;
+    reason?: string;
+    requestId?: string;
+    code?: string;
+    title?: string;
+    departmentId?: string;
+  };
   read_at: string | null;
   created_at: string;
 };
@@ -19,6 +28,8 @@ const TYPE_LABEL: Record<string, string> = {
   upload_rejected: 'Rejected',
   course_approved: 'Course approved',
   course_rejected: 'Course rejected',
+  course_request_submitted: 'New course request',
+  upload_submitted: 'New upload pending',
 };
 
 export default function NotificationsList({ userId }: { userId: string }) {
@@ -93,11 +104,15 @@ export default function NotificationsList({ userId }: { userId: string }) {
               <span className="text-xs text-ink-700/60">{new Date(n.created_at).toLocaleString()}</span>
             </div>
             <p>
-              {n.payload.filename ?? 'An upload'}{' '}
-              {n.type === 'upload_rejected' && n.payload.reason && (
-                <span className="text-ink-700">— {n.payload.reason}</span>
-              )}
-            </p>
+             {n.type === 'course_request_submitted' && `${n.payload.code} — ${n.payload.title ?? 'New course request'}`}
+             {n.type === 'upload_submitted' && (n.payload.filename ?? 'A new upload')}
+             {(n.type === 'upload_approved' || n.type === 'upload_rejected') && (n.payload.filename ?? 'An upload')}
+             {n.type === 'course_rejected' && n.payload.title}
+             {n.type === 'course_approved' && n.payload.title}
+             {n.type === 'upload_rejected' && n.payload.reason && (
+    <span className="text-ink-700"> — {n.payload.reason}</span>
+  )}
+</p>
             {n.payload.courseId && (
               <Link
                 href={`/courses/${n.payload.courseId}`}
