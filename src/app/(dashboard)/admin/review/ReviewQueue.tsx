@@ -39,11 +39,19 @@ export default function ReviewQueue({ userId }: { userId: string }) {
       .select('revoked_at, permissions(key)')
       .eq('profile_id', userId);
 
-    const detectedAccess = (perms ?? []).some(
-      (row: any) =>
+    // NOTE: PostgREST embeds a plain many-to-one relation (permission_id ->
+    // permissions.id) as an ARRAY, not a single object, unless the FK is
+    // explicitly marked one-to-one. So `row.permissions` here is
+    // `[{ key: '...' }]`, not `{ key: '...' }` — reading `.key` directly off
+    // it was always `undefined`, which made detectedAccess permanently false
+    // regardless of what was actually granted in the database.
+    const detectedAccess = (perms ?? []).some((row: any) => {
+      const permsForRow = Array.isArray(row.permissions) ? row.permissions : [row.permissions];
+      return (
         row.revoked_at === null &&
-        ['approve_uploads', 'reject_uploads'].includes(row.permissions?.key)
-    );
+        permsForRow.some((p: any) => p && ['approve_uploads', 'reject_uploads'].includes(p.key))
+      );
+    });
     setHasAccess(detectedAccess);
 
     if (!detectedAccess) {
