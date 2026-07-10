@@ -80,7 +80,9 @@ export function AuthNav({ initialUser }: { initialUser: InitialUser }) {
           </span>
         )}
       </Link>
-      <span className="text-sm text-paper-200/80">{displayName}</span>
+      <Link href="/profile" className="text-sm text-paper-200/80 hover:text-amber-500">
+        {displayName}
+      </Link>
       <button onClick={handleSignOut} className="text-sm hover:text-amber-500">
         Sign out
       </button>
