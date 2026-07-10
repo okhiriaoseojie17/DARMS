@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { BackLink } from '@/components/nav/BackLink';
 import ProfileForm from './ProfileForm';
 import PasswordForm from './PasswordForm';
 
@@ -19,7 +20,8 @@ export default async function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="font-display text-2xl font-semibold text-ink-950">Your profile</h1>
+      <BackLink fallbackHref="/" label="Back" />
+      <h1 className="mt-4 font-display text-2xl font-semibold text-ink-950">Your profile</h1>
       <p className="mt-1 text-sm text-ink-700">
         Update your name, department, and level, or set a password so you can
         sign in without Google.

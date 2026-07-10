@@ -18,7 +18,13 @@ type CourseRequest = {
   levels: { name: string } | null;
 };
 
-export default function CourseRequestQueue({ userId }: { userId: string }) {
+export default function CourseRequestQueue({
+  userId,
+  hideHeader = false,
+}: {
+  userId: string;
+  hideHeader?: boolean;
+}) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
@@ -118,7 +124,7 @@ export default function CourseRequestQueue({ userId }: { userId: string }) {
   if (!hasAccess) {
     return (
       <div className="text-center text-ink-950">
-        <BackLink fallbackHref="/" label="Back" />
+        {!hideHeader && <BackLink fallbackHref="/" label="Back" />}
         <h1 className="mt-6 font-display text-2xl font-semibold">No review access</h1>
         <p className="mt-2 text-sm text-ink-700">
           You don't currently hold course-management permissions for any department.
@@ -130,9 +136,13 @@ export default function CourseRequestQueue({ userId }: { userId: string }) {
 
   return (
     <div className="text-ink-950">
-      <BackLink fallbackHref="/" label="Back" />
-      <h1 className="mt-4 font-display text-2xl font-semibold">Course requests</h1>
-      <p className="mt-2 text-sm text-ink-700">
+      {!hideHeader && (
+        <>
+          <BackLink fallbackHref="/" label="Back" />
+          <h1 className="mt-4 font-display text-2xl font-semibold">Course requests</h1>
+        </>
+      )}
+      <p className={hideHeader ? 'text-sm text-ink-700' : 'mt-2 text-sm text-ink-700'}>
         Showing pending course folder requests — {requests.length} waiting.
       </p>
 

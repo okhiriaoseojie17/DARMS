@@ -63,14 +63,8 @@ export function AuthNav({ initialUser }: { initialUser: InitialUser }) {
       <Link href="/uploads/new" className="text-sm hover:text-amber-500">
         Upload
       </Link>
-      <Link href="/courses/new" className="text-sm hover:text-amber-500">
-        Request course
-      </Link>
       <Link href="/admin/review" className="text-sm hover:text-amber-500">
-        Review queue
-      </Link>
-      <Link href="/admin/courses" className="text-sm hover:text-amber-500">
-     Course requests
+        Review
       </Link>
       <Link href="/notifications" className="relative text-sm hover:text-amber-500">
         Notifications

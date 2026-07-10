@@ -1,22 +1,16 @@
-import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import CourseRequestForm from './CourseRequestForm';
 
+// This route now lives inside /uploads/new as the "Request a course" tab.
+// Kept as a redirect (rather than deleted) so any existing links or
+// bookmarks to /courses/new still land somewhere useful.
 export default async function NewCourseRequestPage() {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
 
   if (!userData?.user) {
-    redirect('/sign-in?next=/courses/new');
+    redirect('/sign-in?next=/uploads/new%3Ftab=request');
   }
 
-  return (
-    <main className="mx-auto min-h-screen max-w-lg px-6 py-16">
-      {/* useSearchParams (for returnTo) requires a Suspense boundary */}
-      <Suspense fallback={<p className="text-sm text-ink-700">Loading…</p>}>
-        <CourseRequestForm />
-      </Suspense>
-    </main>
-  );
+  redirect('/uploads/new?tab=request');
 }

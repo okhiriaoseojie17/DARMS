@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const resourceTypeSchema = z.enum(['notes', 'test', 'assignment', 'exam', 'other']);
+export const resourceTypeSchema = z.enum(['notes', 'test1', 'test2', 'assignment', 'exam', 'other']);
 export const fileTypeSchema = z.enum(['pdf', 'docx', 'pptx', 'image', 'link']);
 
 // What the client is allowed to send when creating an upload. Notice there is

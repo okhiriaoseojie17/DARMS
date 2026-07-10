@@ -69,6 +69,11 @@ export async function POST(request: NextRequest) {
   // permissions, never on anything the client sends. `storage_bucket` starts
   // as 'uploads-pending' since that's genuinely where the browser just put
   // the file, regardless of what status the trigger assigns.
+  //
+  // `resource_type` IS persisted (migration 0022) — this is what the course
+  // page groups by into Test 1 / Test 2 / Exam / Notes / Assignments /
+  // Others folders. Previously this was computed for the filename and then
+  // silently dropped, leaving no reliable column to group on.
   const { data, error } = await supabase
     .from('uploads')
     .insert({
@@ -79,6 +84,7 @@ export async function POST(request: NextRequest) {
       semester: input.semester,
       academic_year: input.academicYear,
       file_type: input.fileType,
+      resource_type: input.resourceType,
       display_label: input.label ?? generatedFilename,
       generated_filename: generatedFilename,
       storage_path: input.storagePath,

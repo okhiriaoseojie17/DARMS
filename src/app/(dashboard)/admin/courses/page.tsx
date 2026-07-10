@@ -1,19 +1,16 @@
-// app/admin/courses/page.tsx
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import CourseRequestQueue from './CourseRequestQueue';
 
+// This route now lives inside /admin/review as the "Course requests" tab.
+// Kept as a redirect so any existing links or bookmarks to /admin/courses
+// still land somewhere useful.
 export default async function AdminCourseRequestsPage() {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
 
   if (!userData?.user) {
-    redirect('/sign-in?next=/admin/courses');
+    redirect('/sign-in?next=/admin/review%3Ftab=courses');
   }
 
-  return (
-    <main className="mx-auto min-h-screen max-w-3xl px-6 py-16">
-      <CourseRequestQueue userId={userData.user.id} />
-    </main>
-  );
+  redirect('/admin/review?tab=courses');
 }

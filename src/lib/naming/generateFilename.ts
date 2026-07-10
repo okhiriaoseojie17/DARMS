@@ -8,17 +8,18 @@
  * Examples this produces:
  *   generateFilename({ courseCode: 'CSC201', resourceType: 'notes', label: 'Linked Lists' })
  *     -> "CSC201 Notes – Linked Lists"
- *   generateFilename({ courseCode: 'CSC201', resourceType: 'test', label: '1', year: '2025' })
+ *   generateFilename({ courseCode: 'CSC201', resourceType: 'test1', year: '2025' })
  *     -> "CSC201 Test 1 – 2025"
  *   generateFilename({ courseCode: 'CSC201', resourceType: 'exam', year: '2023' })
  *     -> "CSC201 Exam – 2023"
  */
 
-export type ResourceType = 'notes' | 'test' | 'assignment' | 'exam' | 'other';
+export type ResourceType = 'notes' | 'test1' | 'test2' | 'assignment' | 'exam' | 'other';
 
 const RESOURCE_TYPE_LABEL: Record<ResourceType, string> = {
   notes: 'Notes',
-  test: 'Test',
+  test1: 'Test 1',
+  test2: 'Test 2',
   assignment: 'Assignment',
   exam: 'Exam',
   other: 'Resource',
@@ -27,12 +28,12 @@ const RESOURCE_TYPE_LABEL: Record<ResourceType, string> = {
 export function generateFilename(input: {
   courseCode: string;
   resourceType: ResourceType;
-  label?: string; // e.g. topic name ("Linked Lists"), or a number ("1")
+  label?: string; // e.g. topic name ("Linked Lists"), or an assignment number ("1")
   year?: string;  // e.g. '2025'
 }): string {
   const typeLabel = RESOURCE_TYPE_LABEL[input.resourceType];
 
-  // "CSC201 Test 1 – 2025": label is a short number/id, year follows it directly
+  // "CSC201 Test 1 – 2025": label is a short qualifier, year follows it directly
   if (input.label && input.year) {
     return `${input.courseCode} ${typeLabel} ${input.label} – ${input.year}`;
   }
@@ -43,7 +44,6 @@ export function generateFilename(input: {
     return `${input.courseCode} ${typeLabel} – ${qualifier}`;
   }
 
-  // "CSC201 Assignment 1" style falls through to caller passing label='1' above;
-  // bare fallback when neither label nor year is given:
+  // Bare fallback when neither label nor year is given:
   return `${input.courseCode} ${typeLabel}`;
 }

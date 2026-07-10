@@ -2,6 +2,18 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 
+// Fixed order, always rendered — a category with zero uploads still shows
+// its own "Nothing here yet" section rather than disappearing, so the
+// course's shape is visible even before it's been populated.
+const CATEGORIES = [
+  { key: 'test1', label: 'Test 1' },
+  { key: 'test2', label: 'Test 2' },
+  { key: 'exam', label: 'Exam' },
+  { key: 'notes', label: 'Notes' },
+  { key: 'assignment', label: 'Assignments' },
+  { key: 'other', label: 'Others' },
+] as const;
+
 export default async function CourseDetailPage({ params }: { params: { id: string } }) {
   const supabase = await createClient();
 
@@ -30,6 +42,11 @@ export default async function CourseDetailPage({ params }: { params: { id: strin
     return supabase.storage.from('uploads-approved').getPublicUrl(upload.storage_path).data.publicUrl;
   }
 
+  const grouped = CATEGORIES.map((cat) => ({
+    ...cat,
+    uploads: (uploads ?? []).filter((u: any) => u.resource_type === cat.key),
+  }));
+
   return (
     <main className="min-h-screen bg-ink-950 px-6 py-16 text-paper-50">
       <div className="mx-auto max-w-3xl">
@@ -44,10 +61,8 @@ export default async function CourseDetailPage({ params }: { params: { id: strin
         </p>
         <h1 className="font-display text-3xl font-semibold">{course.title}</h1>
 
-        <h2 className="mt-10 font-display text-lg font-semibold text-paper-100">Resources</h2>
-
         {(uploads ?? []).length === 0 && (
-          <p className="mt-3 text-paper-200/60">
+          <p className="mt-6 text-paper-200/60">
             No approved resources for this course yet — check back soon, or{' '}
             <Link href="/sign-in" className="underline hover:text-amber-500">
               sign in
@@ -56,29 +71,41 @@ export default async function CourseDetailPage({ params }: { params: { id: strin
           </p>
         )}
 
-        <div className="mt-3 flex flex-col gap-3">
-          {(uploads ?? []).map((upload) => {
-            const url = resolveDownloadUrl(upload);
-            return (
-              <a
-                key={upload.id}
-                href={url ?? '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between rounded-sm border border-paper-200/15 p-4 transition-colors hover:border-amber-500/60"
-              >
-                <div>
-                  <p className="font-mono text-xs text-paper-200/50">
-                    {upload.academic_year} · {upload.semester} Semester
-                  </p>
-                  <p className="mt-1 font-display text-base">{upload.generated_filename}</p>
+        <div className="mt-10 flex flex-col gap-10">
+          {grouped.map((cat) => (
+            <section key={cat.key}>
+              <h2 className="font-display text-lg font-semibold text-paper-100">{cat.label}</h2>
+
+              {cat.uploads.length === 0 ? (
+                <p className="mt-3 text-sm text-paper-200/40">Nothing here yet.</p>
+              ) : (
+                <div className="mt-3 flex flex-col gap-3">
+                  {cat.uploads.map((upload: any) => {
+                    const url = resolveDownloadUrl(upload);
+                    return (
+                      <a
+                        key={upload.id}
+                        href={url ?? '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-between rounded-sm border border-paper-200/15 p-4 transition-colors hover:border-amber-500/60"
+                      >
+                        <div>
+                          <p className="font-mono text-xs text-paper-200/50">
+                            {upload.academic_year} · {upload.semester} Semester
+                          </p>
+                          <p className="mt-1 font-display text-base">{upload.generated_filename}</p>
+                        </div>
+                        <span className="text-xs uppercase tracking-wide text-amber-500">
+                          {upload.file_type}
+                        </span>
+                      </a>
+                    );
+                  })}
                 </div>
-                <span className="text-xs uppercase tracking-wide text-amber-500">
-                  {upload.file_type}
-                </span>
-              </a>
-            );
-          })}
+              )}
+            </section>
+          ))}
         </div>
       </div>
     </main>

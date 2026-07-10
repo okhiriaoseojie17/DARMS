@@ -17,7 +17,13 @@ type PendingUpload = {
   courses: { code: string; title: string } | null;
 };
 
-export default function ReviewQueue({ userId }: { userId: string }) {
+export default function ReviewQueue({
+  userId,
+  hideHeader = false,
+}: {
+  userId: string;
+  hideHeader?: boolean;
+}) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
@@ -128,7 +134,7 @@ export default function ReviewQueue({ userId }: { userId: string }) {
   if (!hasAccess) {
     return (
       <div className="text-center text-ink-950">
-        <BackLink fallbackHref="/" label="Back" />
+        {!hideHeader && <BackLink fallbackHref="/" label="Back" />}
         <h1 className="mt-6 font-display text-2xl font-semibold">No review access</h1>
         <p className="mt-2 text-sm text-ink-700">
           You don't currently hold approve/reject permissions for any course.
@@ -140,9 +146,13 @@ export default function ReviewQueue({ userId }: { userId: string }) {
 
   return (
     <div className="text-ink-950">
-      <BackLink fallbackHref="/" label="Back" />
-      <h1 className="mt-4 font-display text-2xl font-semibold">Review queue</h1>
-      <p className="mt-2 text-sm text-ink-700">
+      {!hideHeader && (
+        <>
+          <BackLink fallbackHref="/" label="Back" />
+          <h1 className="mt-4 font-display text-2xl font-semibold">Review queue</h1>
+        </>
+      )}
+      <p className={hideHeader ? 'text-sm text-ink-700' : 'mt-2 text-sm text-ink-700'}>
         Showing pending uploads within your scope — {uploads.length} waiting.
       </p>
 

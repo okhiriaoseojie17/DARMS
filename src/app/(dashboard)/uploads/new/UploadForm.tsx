@@ -1,20 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES, MIME_TO_FILE_TYPE } from '@/lib/validation/upload';
 import { BackLink } from '@/components/nav/BackLink';
 
 type Course = { id: string; code: string; title: string };
 
-export default function UploadForm() {
+export default function UploadForm({
+  hideHeader = false,
+  onRequestCourse,
+}: {
+  hideHeader?: boolean;
+  onRequestCourse?: () => void;
+} = {}) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<Course[]>([]);
   const [courseSearch, setCourseSearch] = useState('');
   const [courseId, setCourseId] = useState('');
-  const [resourceType, setResourceType] = useState<'notes' | 'test' | 'assignment' | 'exam' | 'other'>('notes');
+  const [resourceType, setResourceType] = useState<'notes' | 'test1' | 'test2' | 'assignment' | 'exam' | 'other'>('notes');
   const [label, setLabel] = useState('');
   const [academicYear, setAcademicYear] = useState('2024/2025');
   const [semester, setSemester] = useState<'First' | 'Second'>('First');
@@ -147,13 +152,27 @@ export default function UploadForm() {
 
   return (
     <div className="text-ink-950">
-      <BackLink fallbackHref="/" label="Back" />
-      <h1 className="mt-4 font-display text-2xl font-semibold">Upload a resource</h1>
-      <p className="mt-2 text-sm text-ink-700">
+      {!hideHeader && (
+        <>
+          <BackLink fallbackHref="/" label="Back" />
+          <h1 className="mt-4 font-display text-2xl font-semibold">Upload a resource</h1>
+        </>
+      )}
+      <p className={hideHeader ? 'text-sm text-ink-700' : 'mt-2 text-sm text-ink-700'}>
         Don't see the course you're looking for?{' '}
-        <Link href="/courses/new?returnTo=/uploads/new" className="underline hover:text-amber-600">
-          Request a new course folder
-        </Link>{' '}
+        {onRequestCourse ? (
+          <button
+            type="button"
+            onClick={onRequestCourse}
+            className="underline hover:text-amber-600"
+          >
+            Request a new course folder
+          </button>
+        ) : (
+          <a href="/courses/new?returnTo=/uploads/new" className="underline hover:text-amber-600">
+            Request a new course folder
+          </a>
+        )}{' '}
         — it'll need approval first, but you won't lose your place; come back
         here once it's live.
       </p>
@@ -191,7 +210,8 @@ export default function UploadForm() {
             className="rounded-sm border border-ink-700/20 px-4 py-3"
           >
             <option value="notes">Notes</option>
-            <option value="test">Test</option>
+            <option value="test1">Test 1</option>
+            <option value="test2">Test 2</option>
             <option value="assignment">Assignment</option>
             <option value="exam">Exam</option>
             <option value="other">Other</option>

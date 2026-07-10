@@ -1,6 +1,7 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
-import UploadForm from './UploadForm';
+import UploadOrRequest from './UploadOrRequest';
 
 export default async function NewUploadPage() {
   const supabase = await createClient();
@@ -12,7 +13,10 @@ export default async function NewUploadPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-lg px-6 py-16">
-      <UploadForm />
+      {/* useSearchParams (for the tab query param) requires a Suspense boundary */}
+      <Suspense fallback={<p className="text-sm text-ink-700">Loading…</p>}>
+        <UploadOrRequest />
+      </Suspense>
     </main>
   );
 }
