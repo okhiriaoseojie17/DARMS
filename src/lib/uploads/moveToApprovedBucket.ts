@@ -3,10 +3,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 /**
  * Moves a file from `uploads-pending` to `uploads-approved` and updates the
  * upload row's storage_bucket accordingly. Used in two places:
- *  1. /api/uploads/[id]/approve — a reviewer manually approving a pending upload
- *  2. /api/uploads (POST) — when the DB trigger auto-approves an upload for a
- *     Lecturer/Level Advisor with scoped auto_approve rights, since that
- *     trigger only flips `status`, it can't reach out to Storage itself
+ * 1. /api/uploads/[id]/approve — a reviewer manually approving a pending upload
+ * 2. /api/uploads (POST) — when the DB trigger auto-approves an upload for a
+ * Lecturer/Level Advisor with scoped auto_approve rights, since that
+ * trigger only flips `status`, it can't reach out to Storage itself
  *
  * Supabase Storage has no cross-bucket move, so this is a plain
  * download -> upload -> delete. No-ops safely for link-type uploads (no
@@ -35,6 +35,7 @@ export async function moveUploadToApprovedBucket(
     .upload(upload.storage_path, fileBlob, { upsert: true });
 
   if (uploadError) {
+    console.error('STORAGE_UPLOAD_ERROR', JSON.stringify(uploadError, null, 2));
     return { success: false, error: uploadError.message };
   }
 
