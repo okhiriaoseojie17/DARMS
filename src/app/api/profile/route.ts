@@ -3,13 +3,14 @@ import { createClient } from '@/lib/supabase/server';
 import { profileUpdateSchema } from '@/lib/validation/profile';
 
 // PATCH /api/profile
-// Lets a signed-in user update their own display name, department(s), and
-// level(s) after onboarding. Department/level changes REPLACE the existing
-// set rather than merge with it — since the UI shows these as multi-select
-// toggles, "save" means "here is my full current selection," not "add
-// these on top of what's there." All writes go through the user's own
-// session; RLS's self_* policies (migrations 0012, 0021) are the actual
-// enforcement, same as the onboarding route.
+// Lets a signed-in user update their own display name, department, and
+// level after onboarding. Department/level are single-select — a user has
+// exactly one of each at a time, changeable. We upsert the chosen value
+// FIRST (safe even if it's already their current selection — no conflict),
+// then delete any other rows for that profile. This order means re-saving
+// the same department/level never throws a duplicate-key error even if
+// migration 0021's self-delete policy hasn't been applied yet; it just
+// means old values won't get cleaned up until that migration is in place.
 export async function PATCH(request: NextRequest) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -25,7 +26,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const { displayName, departmentIds, levelIds } = parsed.data;
+  const { displayName, departmentId, levelId } = parsed.data;
   const profileId = userData.user.id;
 
   if (displayName) {
@@ -39,44 +40,52 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
-  // Note: delete-then-insert isn't atomic — a failure between the two
-  // calls could leave a user with an empty selection. Fine at this scale;
-  // worth wrapping in a Postgres function via rpc() if that ever bites.
-  if (departmentIds) {
-    const { error: deleteError } = await supabase
+  if (departmentId) {
+    const { error: upsertError } = await supabase
       .from('profile_departments')
-      .delete()
-      .eq('profile_id', profileId);
+      .upsert(
+        { profile_id: profileId, department_id: departmentId },
+        { onConflict: 'profile_id,department_id', ignoreDuplicates: true }
+      );
 
-    if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    if (upsertError) {
+      return NextResponse.json({ error: upsertError.message }, { status: 500 });
     }
 
-    const { error: insertError } = await supabase
+    // Requires the self-delete policy from migration 0021. If that
+    // migration hasn't run yet, this simply won't remove the old row(s) —
+    // it won't error.
+    const { error: cleanupError } = await supabase
       .from('profile_departments')
-      .insert(departmentIds.map((department_id) => ({ profile_id: profileId, department_id })));
+      .delete()
+      .eq('profile_id', profileId)
+      .neq('department_id', departmentId);
 
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    if (cleanupError) {
+      return NextResponse.json({ error: cleanupError.message }, { status: 500 });
     }
   }
 
-  if (levelIds) {
-    const { error: deleteError } = await supabase
+  if (levelId) {
+    const { error: upsertError } = await supabase
       .from('profile_levels')
-      .delete()
-      .eq('profile_id', profileId);
+      .upsert(
+        { profile_id: profileId, level_id: levelId },
+        { onConflict: 'profile_id,level_id', ignoreDuplicates: true }
+      );
 
-    if (deleteError) {
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    if (upsertError) {
+      return NextResponse.json({ error: upsertError.message }, { status: 500 });
     }
 
-    const { error: insertError } = await supabase
+    const { error: cleanupError } = await supabase
       .from('profile_levels')
-      .insert(levelIds.map((level_id) => ({ profile_id: profileId, level_id })));
+      .delete()
+      .eq('profile_id', profileId)
+      .neq('level_id', levelId);
 
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+    if (cleanupError) {
+      return NextResponse.json({ error: cleanupError.message }, { status: 500 });
     }
   }
 

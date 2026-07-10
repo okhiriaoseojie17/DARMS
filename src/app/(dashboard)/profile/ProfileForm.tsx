@@ -20,8 +20,8 @@ export default function ProfileForm({
   const [displayName, setDisplayName] = useState(initialDisplayName);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [levels, setLevels] = useState<Level[]>([]);
-  const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
-  const [selectedLevels, setSelectedLevels] = useState<string[]>([]);
+  const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
+  const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -38,16 +38,14 @@ export default function ProfileForm({
 
       setDepartments(deptData ?? []);
       setLevels(levelData ?? []);
-      setSelectedDepartments((myDepts ?? []).map((d) => d.department_id));
-      setSelectedLevels((myLevels ?? []).map((l) => l.level_id));
+      // If old data has more than one row (from before this was single-select),
+      // just take the first — saving will clean the rest up.
+      setSelectedDepartment(myDepts?.[0]?.department_id ?? null);
+      setSelectedLevel(myLevels?.[0]?.level_id ?? null);
       setLoading(false);
     }
     init();
   }, [supabase, userId]);
-
-  function toggle(list: string[], setList: (v: string[]) => void, id: string) {
-    setList(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,8 +58,8 @@ export default function ProfileForm({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         displayName,
-        departmentIds: selectedDepartments,
-        levelIds: selectedLevels,
+        departmentId: selectedDepartment,
+        levelId: selectedLevel,
       }),
     });
 
@@ -110,9 +108,9 @@ export default function ProfileForm({
             <button
               type="button"
               key={dept.id}
-              onClick={() => toggle(selectedDepartments, setSelectedDepartments, dept.id)}
+              onClick={() => setSelectedDepartment(dept.id)}
               className={`rounded-sm border px-3 py-2 text-sm ${
-                selectedDepartments.includes(dept.id)
+                selectedDepartment === dept.id
                   ? 'border-amber-500 bg-amber-500/10 text-ink-950'
                   : 'border-ink-700/20 text-ink-700'
               }`}
@@ -130,9 +128,9 @@ export default function ProfileForm({
             <button
               type="button"
               key={level.id}
-              onClick={() => toggle(selectedLevels, setSelectedLevels, level.id)}
+              onClick={() => setSelectedLevel(level.id)}
               className={`rounded-sm border px-3 py-2 text-sm ${
-                selectedLevels.includes(level.id)
+                selectedLevel === level.id
                   ? 'border-amber-500 bg-amber-500/10 text-ink-950'
                   : 'border-ink-700/20 text-ink-700'
               }`}
@@ -148,7 +146,7 @@ export default function ProfileForm({
 
       <button
         type="submit"
-        disabled={submitting || selectedDepartments.length === 0 || selectedLevels.length === 0}
+        disabled={submitting || !selectedDepartment || !selectedLevel}
         className="self-start rounded-sm bg-ink-950 px-4 py-3 text-sm font-medium text-paper-50 hover:bg-ink-900 disabled:opacity-40"
       >
         {submitting ? 'Saving…' : 'Save changes'}
