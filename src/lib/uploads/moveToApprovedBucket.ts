@@ -32,7 +32,7 @@ export async function moveUploadToApprovedBucket(
 
   const { error: uploadError } = await supabase.storage
     .from('uploads-approved')
-    .upload(upload.storage_path, fileBlob, { upsert: true });
+    .upload(upload.storage_path, fileBlob, { upsert: false });
 
   if (uploadError) {
     console.error('STORAGE_UPLOAD_ERROR', JSON.stringify(uploadError, null, 2));
