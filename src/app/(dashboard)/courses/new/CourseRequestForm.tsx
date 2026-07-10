@@ -16,7 +16,17 @@ type CourseRequest = {
   created_at: string;
 };
 
-export default function CourseRequestForm() {
+// 1. Define the props types your component receives
+interface CourseRequestFormProps {
+  hideHeader?: boolean;
+  onBackToUpload?: () => void;
+}
+
+// 2. Accept and destructure the props here
+export default function CourseRequestForm({ 
+  hideHeader = false, 
+  onBackToUpload 
+}: CourseRequestFormProps) {
   const supabase = createClient();
   const searchParams = useSearchParams();
   const returnTo = searchParams.get('returnTo');
@@ -94,7 +104,15 @@ export default function CourseRequestForm() {
           A department administrator will review it. You'll be able to upload
           to this course once it's approved.
         </p>
-        {returnTo ? (
+        {/* 3. Handle the alternate back button click if prop is supplied */}
+        {onBackToUpload ? (
+          <button
+            onClick={onBackToUpload}
+            className="mt-6 rounded-sm bg-ink-950 px-4 py-3 text-sm font-medium text-paper-50 hover:bg-ink-900"
+          >
+            Back to your upload
+          </button>
+        ) : returnTo ? (
           <button
             onClick={() => (window.location.href = returnTo)}
             className="mt-6 rounded-sm bg-ink-950 px-4 py-3 text-sm font-medium text-paper-50 hover:bg-ink-900"
@@ -115,14 +133,20 @@ export default function CourseRequestForm() {
 
   return (
     <div className="text-ink-950">
-      <BackLink fallbackHref={returnTo ?? '/'} label={returnTo ? 'Back to upload' : 'Back'} />
-      <h1 className="mt-4 font-display text-2xl font-semibold">Request a new course folder</h1>
-      <p className="mt-2 text-sm text-ink-700">
-        Course folders go through review before they're public — this doesn't
-        create the course immediately, it submits a request.
-      </p>
+      {/* 4. Hide header text and traditional back links if hideHeader is active */}
+      {!hideHeader && (
+        <>
+          <BackLink fallbackHref={returnTo ?? '/'} label={returnTo ? 'Back to upload' : 'Back'} />
+          <h1 className="mt-4 font-display text-2xl font-semibold">Request a new course folder</h1>
+          <p className="mt-2 text-sm text-ink-700">
+            Course folders go through review before they're public — this doesn't
+            create the course immediately, it submits a request.
+          </p>
+        </>
+      )}
 
-      <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
+      {/* If header is hidden, adjust margins accordingly (e.g. mt-2 instead of mt-8) */}
+      <form onSubmit={handleSubmit} className={`${hideHeader ? 'mt-2' : 'mt-8'} flex flex-col gap-4`}>
         <label className="flex flex-col gap-1 text-sm">
           Department
           <select
