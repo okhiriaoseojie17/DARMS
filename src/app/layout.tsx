@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Source_Serif_4, Inter, IBM_Plex_Mono } from 'next/font/google';
+import { SiteHeader } from '@/components/nav/SiteHeader';
 import './globals.css';
 
 const displayFont = Source_Serif_4({
@@ -20,10 +21,13 @@ export const metadata: Metadata = {
     'The academic resource archive for the Computer and Information Sciences Department, Covenant University.',
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${displayFont.variable} ${bodyFont.variable} ${monoFont.variable}`}>
-      <body>{children}</body>
+      <body>
+        <SiteHeader />
+        {children}
+      </body>
     </html>
   );
 }

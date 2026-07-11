@@ -1,48 +1,22 @@
 import Link from 'next/link';
-import { AuthNav } from '@/components/nav/AuthNav';
 import { createClient } from '@/lib/supabase/server';
 
 // Design direction: a departmental archive, not a generic SaaS landing page.
 // Dark ink-blue ground (a reading room at night) with paper-toned catalog
 // cards laid on top — course codes get a stamped, monospace treatment since
 // they function as real catalog identifiers here, not decoration.
+// Logo + nav now live in the global SiteHeader (src/app/layout.tsx), so this
+// page only renders the hero content below it.
 
 export default async function HomePage() {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
-  
-  let initialUser: { id: string; displayName: string } | null = null;
-
-  if (userData?.user) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('display_name')
-      .eq('id', userData.user.id)
-      .single();
-      
-    initialUser = { 
-      id: userData.user.id, 
-      displayName: profile?.display_name ?? userData.user.email ?? 'Account' 
-    };
-  }
 
   // Fixes Bug 1: Redirects to upload form if logged in, otherwise to sign-in page
   const contributeHref = userData?.user ? '/uploads/new' : '/sign-in';
 
   return (
     <main className="min-h-screen bg-ink-950 text-paper-50">
-      <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <span className="font-mono text-sm tracking-widest text-paper-200/70">
-          CIS · COVENANT UNIVERSITY
-        </span>
-        <nav className="flex items-center gap-6 text-sm">
-          <Link href="/search" className="hover:text-amber-500">
-            Search
-          </Link>
-          <AuthNav initialUser={initialUser} />
-        </nav>
-      </header>
-
       <section className="mx-auto grid max-w-6xl grid-cols-1 gap-12 px-6 py-16 md:grid-cols-2 md:items-center">
         <div>
           <h1 className="font-display text-4xl font-semibold leading-tight text-paper-50 md:text-5xl">
