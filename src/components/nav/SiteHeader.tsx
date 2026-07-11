@@ -27,15 +27,15 @@ export async function SiteHeader() {
 
   return (
     <header className="border-b border-paper-200/10 bg-ink-950">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5 md:py-6">
         <Link href="/" className="flex items-center gap-2">
           <Image
             src="/logo.png"
             alt="DARMS — Department Academic Resource Management System"
-            width={140}
-            height={76}
+            width={340}
+            height={186}
             priority
-            className="h-8 w-auto md:h-9"
+            className="h-14 w-auto md:h-16"
           />
         </Link>
 
