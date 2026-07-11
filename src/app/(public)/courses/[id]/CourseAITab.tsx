@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 type SourceCategory = 'test1' | 'test2' | 'exam' | 'notes';
@@ -50,10 +50,79 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
   const [question, setQuestion] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const [checkingCache, setCheckingCache] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [quiz, setQuiz] = useState<QuizQuestion[] | null>(null);
   const [answer, setAnswer] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
+  const [fromCache, setFromCache] = useState(false);
+  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
+
+  const categoryHasMaterial = (key: SourceCategory) =>
+    key === 'notes' ? availability.notes.length > 0 : availability[key];
+
+  const selectionReady =
+    category !== null && categoryHasMaterial(category) && (category !== 'notes' || Boolean(noteUploadId));
+
+  // Whenever the quiz-mode selection changes, silently check whether this
+  // exact combo already has a generated set from a past visit — if so, show
+  // it right away instead of making the person wait on a fresh Gemini call
+  // for something they've already generated before.
+  useEffect(() => {
+    if (mode !== 'quiz' || !selectionReady || !category) {
+      setQuiz(null);
+      setFromCache(false);
+      setGeneratedAt(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function checkCache() {
+      setCheckingCache(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams({
+          courseId,
+          sourceCategory: category as string,
+          questionType,
+          difficulty,
+        });
+        if (category === 'notes') params.set('noteUploadId', noteUploadId);
+
+        const res = await fetch(`/api/ai/question-bank?${params.toString()}`);
+        const data = await res.json();
+        if (cancelled) return;
+
+        if (res.ok && data.questionBank) {
+          setQuiz(data.questionBank.content.questions as QuizQuestion[]);
+          setFromCache(true);
+          setGeneratedAt(data.questionBank.generated_at as string);
+          setRevealed({});
+        } else {
+          setQuiz(null);
+          setFromCache(false);
+          setGeneratedAt(null);
+        }
+      } catch {
+        // A failed cache check just means we fall back to "no cache found" —
+        // the person can still hit Generate manually, so this stays silent
+        // rather than surfacing an error for a background lookup.
+        if (!cancelled) {
+          setQuiz(null);
+          setFromCache(false);
+        }
+      } finally {
+        if (!cancelled) setCheckingCache(false);
+      }
+    }
+
+    checkCache();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, category, noteUploadId, questionType, difficulty, selectionReady]);
 
   if (!isSignedIn) {
     return (
@@ -66,31 +135,18 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
     );
   }
 
-  const categoryHasMaterial = (key: SourceCategory) =>
-    key === 'notes' ? availability.notes.length > 0 : availability[key];
-
-  const canSubmit =
-    category !== null &&
-    categoryHasMaterial(category) &&
-    (category !== 'notes' || noteUploadId) &&
-    (mode === 'quiz' || question.trim().length >= 3);
-
-  function resetResults() {
-    setQuiz(null);
-    setAnswer(null);
-    setRevealed({});
-    setError(null);
-  }
+  const canSubmit = selectionReady && (mode === 'quiz' || question.trim().length >= 3);
 
   function handlePickCategory(key: SourceCategory) {
     setCategory(key);
     setNoteUploadId('');
-    resetResults();
+    setAnswer(null);
+    setError(null);
   }
 
   async function handleGenerateQuiz() {
     if (!category) return;
-    resetResults();
+    setError(null);
     setLoading(true);
     try {
       const res = await fetch('/api/ai/question-bank', {
@@ -110,6 +166,9 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
         return;
       }
       setQuiz(data.questionBank.content.questions as QuizQuestion[]);
+      setFromCache(false);
+      setGeneratedAt(data.questionBank.generated_at as string);
+      setRevealed({});
     } catch {
       setError('Something went wrong. Please try again.');
     } finally {
@@ -119,7 +178,8 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
 
   async function handleAsk() {
     if (!category || !question.trim()) return;
-    resetResults();
+    setError(null);
+    setAnswer(null);
     setLoading(true);
     try {
       const res = await fetch('/api/ai/ask', {
@@ -145,6 +205,14 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
     }
   }
 
+  const generateButtonLabel = loading
+    ? fromCache
+      ? 'Regenerating…'
+      : 'Generating…'
+    : fromCache
+    ? 'Regenerate'
+    : 'Generate';
+
   return (
     <div className="mt-3 flex flex-col gap-5 rounded-sm border border-paper-200/15 p-6">
       {/* Mode toggle */}
@@ -153,7 +221,8 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
           type="button"
           onClick={() => {
             setMode('quiz');
-            resetResults();
+            setAnswer(null);
+            setError(null);
           }}
           className={`rounded-sm px-3 py-2 uppercase tracking-wide ${
             mode === 'quiz' ? 'bg-amber-500 text-ink-950' : 'border border-paper-200/20 text-paper-200/60'
@@ -165,7 +234,9 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
           type="button"
           onClick={() => {
             setMode('ask');
-            resetResults();
+            setQuiz(null);
+            setFromCache(false);
+            setError(null);
           }}
           className={`rounded-sm px-3 py-2 uppercase tracking-wide ${
             mode === 'ask' ? 'bg-amber-500 text-ink-950' : 'border border-paper-200/20 text-paper-200/60'
@@ -272,13 +343,29 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
             </p>
           </div>
 
+          {checkingCache && (
+            <p className="text-xs text-paper-200/40">Checking for a set you've already generated…</p>
+          )}
+
+          {fromCache && generatedAt && !checkingCache && (
+            <p className="text-xs text-paper-200/50">
+              Showing the set you generated on{' '}
+              {new Date(generatedAt).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+              . Regenerating replaces it with a new one.
+            </p>
+          )}
+
           <button
             type="button"
-            disabled={!canSubmit || loading}
+            disabled={!canSubmit || loading || checkingCache}
             onClick={handleGenerateQuiz}
             className="self-start rounded-sm bg-paper-50 px-4 py-3 text-sm font-medium text-ink-950 hover:bg-paper-100 disabled:opacity-30"
           >
-            {loading ? 'Generating…' : 'Generate'}
+            {generateButtonLabel}
           </button>
         </>
       ) : (

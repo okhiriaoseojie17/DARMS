@@ -4,5 +4,6 @@
       "path": "/api/cron/retention-purge",
       "schedule": "0 3 * * *"
     }
-  ]
+  ],
+  "regions": ["dub1"]
 }

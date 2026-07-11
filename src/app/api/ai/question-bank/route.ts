@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
   if (!course) {
     return NextResponse.json({ error: "Course not found" }, { status: 404 });
   }
-  if (course.course_settings?.[0]?.ai_indexing_allowed === false) {
+  if (course.course_settings?.ai_indexing_allowed === false) {
     return NextResponse.json(
       { error: "AI features are disabled for this course" },
       { status: 403 }
