@@ -22,10 +22,10 @@ type Notification = {
   created_at: string;
 };
 
-// In NotificationsList.tsx
 const TYPE_LABEL: Record<string, string> = {
   upload_approved: 'Approved',
   upload_rejected: 'Rejected',
+  upload_deleted: 'Removed',
   course_approved: 'Course approved',
   course_rejected: 'Course rejected',
   course_request_submitted: 'New course request',
@@ -64,6 +64,20 @@ export default function NotificationsList({ userId }: { userId: string }) {
     );
   }
 
+  // Hard delete — notifications aren't audited/compliance-relevant data the
+  // way uploads and courses are, so "clear" means gone, not soft-deleted.
+  async function deleteOne(id: string) {
+    await supabase.from('notifications').delete().eq('id', id);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  }
+
+  async function clearAll() {
+    if (notifications.length === 0) return;
+    if (!window.confirm('Clear all notifications? This can\'t be undone.')) return;
+    await supabase.from('notifications').delete().eq('profile_id', userId);
+    setNotifications([]);
+  }
+
   if (loading) {
     return <p className="text-sm text-ink-700">Loading…</p>;
   }
@@ -73,11 +87,18 @@ export default function NotificationsList({ userId }: { userId: string }) {
       <BackLink fallbackHref="/" label="Back" />
       <div className="mt-4 flex items-center justify-between">
         <h1 className="font-display text-2xl font-semibold">Notifications</h1>
-        {notifications.some((n) => !n.read_at) && (
-          <button onClick={markAllRead} className="text-sm text-ink-700 underline hover:text-amber-600">
-            Mark all as read
-          </button>
-        )}
+        <div className="flex items-center gap-4">
+          {notifications.some((n) => !n.read_at) && (
+            <button onClick={markAllRead} className="text-sm text-ink-700 underline hover:text-amber-600">
+              Mark all as read
+            </button>
+          )}
+          {notifications.length > 0 && (
+            <button onClick={clearAll} className="text-sm text-red-600 underline hover:text-red-700">
+              Clear all
+            </button>
+          )}
+        </div>
       </div>
 
       {notifications.length === 0 && (
@@ -86,27 +107,44 @@ export default function NotificationsList({ userId }: { userId: string }) {
 
       <div className="mt-6 flex flex-col gap-2">
         {notifications.map((n) => (
-          <button
+          <div
             key={n.id}
             onClick={() => markRead(n.id)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') markRead(n.id);
+            }}
+            role="button"
+            tabIndex={0}
             className={`flex flex-col gap-1 rounded-sm border px-4 py-3 text-left text-sm transition-colors ${
               n.read_at ? 'border-ink-700/10 text-ink-700' : 'border-amber-500/50 bg-amber-500/5 text-ink-950'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <span
-                className={`rounded-sm px-2 py-0.5 text-xs font-medium uppercase ${
-                  n.type === 'upload_approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                }`}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span
+                  className={`rounded-sm px-2 py-0.5 text-xs font-medium uppercase ${
+                    n.type === 'upload_approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}
+                >
+                  {TYPE_LABEL[n.type] ?? n.type}
+                </span>
+                <span className="text-xs text-ink-700/60">{new Date(n.created_at).toLocaleString()}</span>
+              </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteOne(n.id);
+                }}
+                className="shrink-0 text-xs text-ink-700/50 hover:text-red-600"
+                aria-label="Delete notification"
               >
-                {TYPE_LABEL[n.type] ?? n.type}
-              </span>
-              <span className="text-xs text-ink-700/60">{new Date(n.created_at).toLocaleString()}</span>
+                Dismiss
+              </button>
             </div>
             <p>
              {n.type === 'course_request_submitted' && `${n.payload.code} — ${n.payload.title ?? 'New course request'}`}
              {n.type === 'upload_submitted' && (n.payload.filename ?? 'A new upload')}
-             {(n.type === 'upload_approved' || n.type === 'upload_rejected') && (n.payload.filename ?? 'An upload')}
+             {(n.type === 'upload_approved' || n.type === 'upload_rejected' || n.type === 'upload_deleted') && (n.payload.filename ?? 'An upload')}
              {n.type === 'course_rejected' && n.payload.title}
              {n.type === 'course_approved' && n.payload.title}
              {n.type === 'upload_rejected' && n.payload.reason && (
@@ -122,7 +160,7 @@ export default function NotificationsList({ userId }: { userId: string }) {
                 View course
               </Link>
             )}
-          </button>
+          </div>
         ))}
       </div>
     </div>

@@ -75,7 +75,7 @@ export default function ManageUploads({ userId }: { userId: string }) {
   async function handleDelete(id: string, filename: string) {
     if (
       !window.confirm(
-        `Delete "${filename}"? It disappears from the site immediately and can't be undone from here.`
+        `Delete "${filename}" permanently? This removes the file from Supabase Storage right away — there's no undo.`
       )
     ) {
       return;
@@ -86,6 +86,11 @@ export default function ManageUploads({ userId }: { userId: string }) {
     const data = await res.json();
     setBusyId(null);
 
+    if (res.status === 207) {
+      setMessage(data.warning ?? 'Removed from the site, but storage cleanup failed — check Supabase.');
+      setUploads((prev) => prev.filter((u) => u.id !== id));
+      return;
+    }
     if (!res.ok) {
       setMessage(data.error ?? 'Delete failed.');
       return;

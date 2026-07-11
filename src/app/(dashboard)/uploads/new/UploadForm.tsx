@@ -45,13 +45,28 @@ export default function UploadForm({
     init();
   }, [supabase]);
 
-  const filteredCourses = courses.filter(
-    (c) =>
-      c.code.toLowerCase().includes(courseSearch.toLowerCase()) ||
-      c.title.toLowerCase().includes(courseSearch.toLowerCase())
-  );
-
   const selectedCourse = courses.find((c) => c.id === courseId) ?? null;
+
+  // Only computed (and only shown) while there's active search text and
+  // nothing picked yet — this is a search-as-you-type suggestion list, not
+  // a permanently visible catalog.
+  const filteredCourses = courseSearch.trim()
+    ? courses.filter(
+        (c) =>
+          c.code.toLowerCase().includes(courseSearch.toLowerCase()) ||
+          c.title.toLowerCase().includes(courseSearch.toLowerCase())
+      )
+    : [];
+
+  function handlePickCourse(c: Course) {
+    setCourseId(c.id);
+    setCourseSearch('');
+  }
+
+  function handleChangeCourse() {
+    setCourseId('');
+    setCourseSearch('');
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -185,26 +200,48 @@ export default function UploadForm({
       <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm">
           Course
-          <input
-            type="text"
-            placeholder="Search by code or title…"
-            value={courseSearch}
-            onChange={(e) => setCourseSearch(e.target.value)}
-            className="rounded-sm border border-ink-700/20 px-4 py-3"
-          />
-          <select
-            required
-            value={courseId}
-            onChange={(e) => setCourseId(e.target.value)}
-            size={Math.min(6, Math.max(3, filteredCourses.length))}
-            className="mt-1 rounded-sm border border-ink-700/20 px-4 py-2"
-          >
-            {filteredCourses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.code} — {c.title}
-              </option>
-            ))}
-          </select>
+          {selectedCourse ? (
+            <div className="flex items-center justify-between rounded-sm border border-ink-700/20 px-4 py-3">
+              <span>
+                {selectedCourse.code} — {selectedCourse.title}
+              </span>
+              <button
+                type="button"
+                onClick={handleChangeCourse}
+                className="text-xs font-medium text-amber-600 underline"
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search by code or title…"
+                value={courseSearch}
+                onChange={(e) => setCourseSearch(e.target.value)}
+                className="w-full rounded-sm border border-ink-700/20 px-4 py-3"
+              />
+              {courseSearch.trim() && (
+                <div className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-sm border border-ink-700/20 bg-paper-50 shadow-md">
+                  {filteredCourses.length === 0 ? (
+                    <p className="px-4 py-3 text-sm text-ink-700/60">No matching courses.</p>
+                  ) : (
+                    filteredCourses.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => handlePickCourse(c)}
+                        className="block w-full px-4 py-2 text-left text-sm hover:bg-amber-500/10"
+                      >
+                        {c.code} — {c.title}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </label>
 
         {selectedCourse && (

@@ -51,6 +51,7 @@ export default function CourseRequestForm({
         supabase
           .from('course_creation_requests')
           .select('*')
+          .neq('status', 'approved')
           .order('created_at', { ascending: false }),
       ]);
 

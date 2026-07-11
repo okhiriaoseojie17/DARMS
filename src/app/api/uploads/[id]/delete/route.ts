@@ -2,20 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
 // POST /api/uploads/[id]/delete
-// Soft-delete only — sets status='deleted' + deleted_at, the same lifecycle
-// the architecture doc defines (any status -> deleted starts the retention
-// countdown). The file's bytes are NOT removed here; the existing
-// retention-purge cron physically removes them after the retention window,
-// same as a rejected upload. Because "uploads_public_read_approved" only
-// ever returns status='approved' rows, a deleted upload disappears from the
-// public course page immediately — no caching-related follow-up needed on
-// the read side for this specific case.
+// Deletion here does TWO things: (1) flips status to 'deleted' so the file
+// disappears from every public read immediately (RLS only ever returns
+// status='approved' rows), and (2) immediately removes the actual bytes
+// from Supabase Storage. Unlike the architecture doc's original 90-day
+// retention-window design, this project is on a storage-limited free tier,
+// so a deleted file's bytes need to stop counting against quota right away
+// rather than waiting for the retention-purge cron. That trades away the
+// safety net of an undo window — once this runs, the file is gone for
+// good, not just hidden.
 //
-// RLS's "uploads_reviewer_update_scoped" policy (migration 0010) already
-// covers this: it grants update access to anyone holding approve_uploads,
-// reject_uploads, OR delete_uploads within the matching course/department/
-// level scope. If the signed-in user doesn't hold delete_uploads there,
-// this update is silently rejected by RLS and we return a 403.
+// The status update is subject to RLS's "uploads_reviewer_update_scoped"
+// policy (migration 0010) — only approve_uploads/reject_uploads/
+// delete_uploads holders in the matching scope can do this at all.
 export async function POST(_request: NextRequest, { params }: { params: { id: string } }) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -26,7 +25,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
 
   const { data: upload, error: fetchError } = await supabase
     .from('uploads')
-    .select('id, uploader_id, generated_filename, course_id, status')
+    .select('id, uploader_id, generated_filename, course_id, status, storage_path, storage_bucket, file_type')
     .eq('id', params.id)
     .single();
 
@@ -61,6 +60,23 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
       courseId: upload.course_id,
     },
   });
+
+  // Site-visibility is already fixed by the status update above regardless
+  // of what happens below — this part only affects Storage quota.
+  if (upload.storage_path && upload.storage_bucket) {
+    const { error: storageError } = await supabase.storage
+      .from(upload.storage_bucket)
+      .remove([upload.storage_path]);
+
+    if (storageError) {
+      return NextResponse.json(
+        {
+          warning: `Removed from the site, but couldn't clear the file from storage: ${storageError.message}. You may need to remove it manually in the Supabase dashboard.`,
+        },
+        { status: 207 }
+      );
+    }
+  }
 
   return NextResponse.json({ success: true });
 }

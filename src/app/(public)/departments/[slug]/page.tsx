@@ -1,6 +1,13 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { displaySemester } from '@/lib/semester';
+import { SemesterCourseDropdown } from './SemesterCourseDropdown';
+
+// Same reasoning as the course detail page: this list changes whenever an
+// admin approves/deletes a course, so it shouldn't be served from a stale
+// cache.
+export const dynamic = 'force-dynamic';
 
 export default async function DepartmentDetailPage({ params }: { params: { slug: string } }) {
   const supabase = await createClient();
@@ -47,27 +54,29 @@ export default async function DepartmentDetailPage({ params }: { params: { slug:
 
         {levels.map((level: any) => {
           const levelCourses = (courses ?? []).filter((c) => c.level_id === level.id);
+          // Alpha/Omega sections are hardcoded per level — they always
+          // render, same as the Test 1/Test 2/Exam/etc. folders on a
+          // course page, so the structure is visible even before any
+          // courses exist for that level/semester.
+          const alphaCourses = levelCourses.filter((c) => c.semester === 'First');
+          const omegaCourses = levelCourses.filter((c) => c.semester === 'Second');
+
           return (
             <section key={level.id} className="mt-10">
               <h2 className="font-display text-xl font-semibold text-paper-100">
                 Level {level.name}
               </h2>
-              {levelCourses.length === 0 ? (
-                <p className="mt-2 text-sm text-paper-200/50">No approved courses yet.</p>
-              ) : (
-                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
-                  {levelCourses.map((course) => (
-                    <Link
-                      key={course.id}
-                      href={`/courses/${course.id}`}
-                      className="rounded-sm border border-paper-200/15 p-4 transition-colors hover:border-amber-500/60"
-                    >
-                      <p className="font-mono text-xs text-paper-200/60">{course.code}</p>
-                      <p className="mt-1 font-display text-base">{course.title}</p>
-                    </Link>
-                  ))}
-                </div>
-              )}
+
+              <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
+                <SemesterCourseDropdown
+                  label={`${displaySemester('First')} Semester`}
+                  courses={alphaCourses}
+                />
+                <SemesterCourseDropdown
+                  label={`${displaySemester('Second')} Semester`}
+                  courses={omegaCourses}
+                />
+              </div>
             </section>
           );
         })}
