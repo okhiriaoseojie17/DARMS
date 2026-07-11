@@ -4,25 +4,18 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { generateWithGemini, GeminiError } from "@/lib/ai/gemini";
 import { buildQuestionPrompt } from "@/lib/ai/buildQuestionPrompt";
+import { fetchUploadContent, type GeminiPart } from "@/lib/ai/fetchUploadContent";
 
 const generateSchema = z.object({
   courseId: z.string().uuid(),
   sourceCategory: z.enum(["test1", "test2", "exam", "notes"]),
   questionType: z.enum(["objective", "theory", "mixed"]),
   difficulty: z.enum(["easy", "normal", "hard"]),
-  // Only required when sourceCategory === "notes" — the one file the user picked.
-  // For test1/test2/exam, all approved uploads of that category are pooled automatically.
   noteUploadId: z.string().uuid().optional(),
 });
 
 // GET /api/ai/question-bank?courseId=...&sourceCategory=...&questionType=...&difficulty=...&noteUploadId=...
-//
-// Looks up the most recent question bank this user already generated for
-// this exact combination, so the AI tab can show it instantly instead of
-// re-calling Gemini every time someone revisits a course/category they've
-// already generated a set for. Returns { questionBank: null } (200, not 404)
-// when nothing matches yet — "no cache" is a normal, expected outcome here,
-// not an error.
+// Cache lookup — unchanged, doesn't touch file content at all.
 export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const {
@@ -54,15 +47,10 @@ export async function GET(req: NextRequest) {
     .eq("source_category", sourceCategory)
     .eq("question_type", questionType)
     .eq("difficulty", difficulty)
-    // Belt-and-braces alongside RLS, which already scopes this to the
-    // caller's own rows — being explicit here costs nothing.
     .eq("generated_by", user.id)
     .order("generated_at", { ascending: false })
     .limit(1);
 
-  // For notes, a cached set only counts as a match if it was generated from
-  // this exact note — different notes get their own cache entries, never
-  // shared, since they're genuinely different source material.
   if (sourceCategory === "notes") {
     if (!noteUploadId) {
       return NextResponse.json(
@@ -82,10 +70,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ questionBank: data?.[0] ?? null });
 }
 
-// POST /api/ai/question-bank — always generates a fresh set (used for both
-// the first generation and explicit "Regenerate" clicks). Caching which set
-// to *show* is the GET route's job; this route's job is only ever "make a
-// new one."
+// POST /api/ai/question-bank — always generates a fresh set.
+// Now reads the actual approved file(s) from storage (PDF/image sent
+// directly to Gemini, docx converted to text via mammoth) instead of a
+// pre-extracted_text column that nothing currently populates.
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
 
@@ -93,7 +81,6 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Signed-in students only — no anonymous/public access to generation.
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -130,10 +117,9 @@ export async function POST(req: NextRequest) {
 
   let uploadsQuery = supabase
     .from("uploads")
-    .select("id, extracted_text, display_label")
+    .select("id, file_type, storage_path, display_label, generated_filename")
     .eq("course_id", courseId)
-    .eq("status", "approved")
-    .not("extracted_text", "is", null);
+    .eq("status", "approved");
 
   uploadsQuery =
     sourceCategory === "notes"
@@ -147,30 +133,40 @@ export async function POST(req: NextRequest) {
   }
   if (!uploads || uploads.length === 0) {
     return NextResponse.json(
-      {
-        error:
-          "No approved, text-extracted uploads found for this selection. " +
-          "The source file(s) may still be processing, or may not have readable text.",
-      },
+      { error: "No approved uploads found for this selection yet." },
       { status: 404 }
     );
   }
 
-  const sourceTexts = uploads.map((u) => u.extracted_text as string);
-  const sourceUploadIds = uploads.map((u) => u.id);
+  const fileParts = (
+    await Promise.all(uploads.map((u) => fetchUploadContent(supabase, u)))
+  ).filter((p): p is GeminiPart => p !== null);
 
-  const prompt = buildQuestionPrompt({
+  if (fileParts.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "The approved file(s) for this selection aren't in a format the AI can currently read " +
+          "(PDF, image, and DOCX are supported — PPTX and external links aren't yet).",
+      },
+      { status: 422 }
+    );
+  }
+
+  const instructionPrompt = buildQuestionPrompt({
     courseTitle: course.title,
     courseCode: course.code,
     sourceCategory,
     questionType,
     difficulty,
-    sourceTexts,
   });
 
   let content: unknown;
   try {
-    const raw = await generateWithGemini(prompt, { responseFormat: "json" });
+    const raw = await generateWithGemini(
+      [{ text: instructionPrompt }, ...fileParts],
+      { responseFormat: "json" }
+    );
     content = JSON.parse(raw);
   } catch (err) {
     if (err instanceof GeminiError) {
@@ -181,6 +177,8 @@ export async function POST(req: NextRequest) {
       { status: 502 }
     );
   }
+
+  const sourceUploadIds = uploads.map((u) => u.id);
 
   const { data: saved, error: saveError } = await supabase
     .from("question_banks")

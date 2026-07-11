@@ -1,8 +1,9 @@
 // src/lib/ai/gemini.ts
 //
 // Thin wrapper around Google's Gemini API. Requires GEMINI_API_KEY in env.
-// Uses gemini-1.5-flash by default — it's on the free tier and has a large
-// enough context window to take a full test/exam's extracted text directly.
+// Uses gemini-1.5-flash — free tier, large context window, and reads PDFs/
+// images natively (no separate OCR step needed).
+import type { GeminiPart } from "./fetchUploadContent";
 
 const GEMINI_MODEL = "gemini-1.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
@@ -21,7 +22,7 @@ interface GenerateOptions {
 }
 
 export async function generateWithGemini(
-  prompt: string,
+  parts: GeminiPart[],
   options: GenerateOptions = {}
 ): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -35,7 +36,7 @@ export async function generateWithGemini(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
+      contents: [{ parts }],
       generationConfig: {
         temperature: 0.7,
         ...(responseFormat === "json" ? { responseMimeType: "application/json" } : {}),

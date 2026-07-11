@@ -54,7 +54,7 @@ export type CreateUploadInput = z.infer<typeof createUploadSchema>;
 // just update NEXT_PUBLIC_MAX_UPLOAD_MB in Vercel and both client and server
 // pick it up. NEXT_PUBLIC_ prefix is required since UploadForm.tsx (a client
 // component) reads this too. Falls back to 8MB if unset.
-export const MAX_FILE_SIZE_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? 8);
+export const MAX_FILE_SIZE_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? 5);
 export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
 
 export const ALLOWED_MIME_TYPES = [

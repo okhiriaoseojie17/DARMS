@@ -3,12 +3,12 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { generateWithGemini, GeminiError } from "@/lib/ai/gemini";
 import { buildAskPrompt } from "@/lib/ai/buildQuestionPrompt";
+import { fetchUploadContent, type GeminiPart } from "@/lib/ai/fetchUploadContent";
 
 const requestSchema = z.object({
   courseId: z.string().uuid(),
   sourceCategory: z.enum(["test1", "test2", "exam", "notes"]),
   question: z.string().min(3).max(500),
-  // Required when sourceCategory === "notes" — same pattern as generation.
   noteUploadId: z.string().uuid().optional(),
 });
 
@@ -19,7 +19,6 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Signed-in students only.
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
@@ -55,10 +54,9 @@ export async function POST(req: NextRequest) {
 
   let uploadsQuery = supabase
     .from("uploads")
-    .select("id, extracted_text")
+    .select("id, file_type, storage_path, display_label, generated_filename")
     .eq("course_id", courseId)
-    .eq("status", "approved")
-    .not("extracted_text", "is", null);
+    .eq("status", "approved");
 
   uploadsQuery =
     sourceCategory === "notes"
@@ -72,26 +70,38 @@ export async function POST(req: NextRequest) {
   }
   if (!uploads || uploads.length === 0) {
     return NextResponse.json(
-      {
-        error:
-          "No approved, text-extracted uploads found for this selection yet.",
-      },
+      { error: "No approved uploads found for this selection yet." },
       { status: 404 }
     );
   }
 
-  const sourceTexts = uploads.map((u) => u.extracted_text as string);
+  const fileParts = (
+    await Promise.all(uploads.map((u) => fetchUploadContent(supabase, u)))
+  ).filter((p): p is GeminiPart => p !== null);
 
-  const prompt = buildAskPrompt({
+  if (fileParts.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "The approved file(s) for this selection aren't in a format the AI can currently read " +
+          "(PDF, image, and DOCX are supported — PPTX and external links aren't yet).",
+      },
+      { status: 422 }
+    );
+  }
+
+  const instructionPrompt = buildAskPrompt({
     courseTitle: course.title,
     courseCode: course.code,
     sourceCategory,
-    sourceTexts,
     question,
   });
 
   try {
-    const answer = await generateWithGemini(prompt, { responseFormat: "text" });
+    const answer = await generateWithGemini(
+      [{ text: instructionPrompt }, ...fileParts],
+      { responseFormat: "text" }
+    );
     return NextResponse.json({ answer });
   } catch (err) {
     if (err instanceof GeminiError) {
