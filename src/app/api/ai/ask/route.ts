@@ -1,7 +1,6 @@
-// src/app/api/ai/ask/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createServerClient } from "@/lib/supabase/server"; // adjust to your actual export
+import { createClient } from "@/lib/supabase/server";
 import { generateWithGemini, GeminiError } from "@/lib/ai/gemini";
 import { buildAskPrompt } from "@/lib/ai/buildQuestionPrompt";
 
@@ -14,7 +13,7 @@ const requestSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const supabase = createServerClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
@@ -47,7 +46,7 @@ export async function POST(req: NextRequest) {
   if (!course) {
     return NextResponse.json({ error: "Course not found" }, { status: 404 });
   }
-  if (course.course_settings?.ai_indexing_allowed === false) {
+  if (course.course_settings?.[0]?.ai_indexing_allowed === false) {
     return NextResponse.json(
       { error: "AI features are disabled for this course" },
       { status: 403 }

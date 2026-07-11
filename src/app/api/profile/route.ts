@@ -4,13 +4,18 @@ import { profileUpdateSchema } from '@/lib/validation/profile';
 
 // PATCH /api/profile
 // Lets a signed-in user update their own display name, department, and
-// level after onboarding. Department/level are single-select — a user has
-// exactly one of each at a time, changeable. We upsert the chosen value
-// FIRST (safe even if it's already their current selection — no conflict),
-// then delete any other rows for that profile. This order means re-saving
-// the same department/level never throws a duplicate-key error even if
-// migration 0021's self-delete policy hasn't been applied yet; it just
-// means old values won't get cleaned up until that migration is in place.
+// level after onboarding. Department/level are single-select — upsert the
+// chosen value first (safe even if unchanged), then delete any other rows
+// for that profile.
+//
+// IMPORTANT: a blocked-by-RLS delete does NOT raise a Postgres error — it
+// just matches zero rows silently. Without checking for that, this route
+// would report success even when migration 0021's self-delete policy
+// hasn't been applied and the old department/level was never actually
+// removed. To catch that, each cleanup delete uses .select() to see
+// exactly what it removed, and compares that against what was there
+// beforehand — if something should have been cleaned up and wasn't, that's
+// reported back as a warning instead of a silent no-op.
 export async function PATCH(request: NextRequest) {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -28,6 +33,7 @@ export async function PATCH(request: NextRequest) {
 
   const { displayName, departmentId, levelId } = parsed.data;
   const profileId = userData.user.id;
+  const warnings: string[] = [];
 
   if (displayName) {
     const { error } = await supabase
@@ -41,6 +47,13 @@ export async function PATCH(request: NextRequest) {
   }
 
   if (departmentId) {
+    const { data: priorRows } = await supabase
+      .from('profile_departments')
+      .select('department_id')
+      .eq('profile_id', profileId);
+
+    const hadOtherDepartment = (priorRows ?? []).some((r) => r.department_id !== departmentId);
+
     const { error: upsertError } = await supabase
       .from('profile_departments')
       .upsert(
@@ -52,21 +65,32 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: upsertError.message }, { status: 500 });
     }
 
-    // Requires the self-delete policy from migration 0021. If that
-    // migration hasn't run yet, this simply won't remove the old row(s) —
-    // it won't error.
-    const { error: cleanupError } = await supabase
+    const { data: cleanedRows, error: cleanupError } = await supabase
       .from('profile_departments')
       .delete()
       .eq('profile_id', profileId)
-      .neq('department_id', departmentId);
+      .neq('department_id', departmentId)
+      .select();
 
     if (cleanupError) {
       return NextResponse.json({ error: cleanupError.message }, { status: 500 });
     }
+
+    if (hadOtherDepartment && (cleanedRows ?? []).length === 0) {
+      warnings.push(
+        'Department saved, but your old department could not be removed — this usually means migration 0021_profile_edit_policies.sql has not been run yet.'
+      );
+    }
   }
 
   if (levelId) {
+    const { data: priorRows } = await supabase
+      .from('profile_levels')
+      .select('level_id')
+      .eq('profile_id', profileId);
+
+    const hadOtherLevel = (priorRows ?? []).some((r) => r.level_id !== levelId);
+
     const { error: upsertError } = await supabase
       .from('profile_levels')
       .upsert(
@@ -78,15 +102,26 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: upsertError.message }, { status: 500 });
     }
 
-    const { error: cleanupError } = await supabase
+    const { data: cleanedRows, error: cleanupError } = await supabase
       .from('profile_levels')
       .delete()
       .eq('profile_id', profileId)
-      .neq('level_id', levelId);
+      .neq('level_id', levelId)
+      .select();
 
     if (cleanupError) {
       return NextResponse.json({ error: cleanupError.message }, { status: 500 });
     }
+
+    if (hadOtherLevel && (cleanedRows ?? []).length === 0) {
+      warnings.push(
+        'Level saved, but your old level could not be removed — this usually means migration 0021_profile_edit_policies.sql has not been run yet.'
+      );
+    }
+  }
+
+  if (warnings.length > 0) {
+    return NextResponse.json({ warning: warnings.join(' ') }, { status: 207 });
   }
 
   return NextResponse.json({ success: true });

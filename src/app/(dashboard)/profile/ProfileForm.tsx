@@ -66,6 +66,11 @@ export default function ProfileForm({
     const data = await res.json();
     setSubmitting(false);
 
+    if (res.status === 207) {
+      setMessage(data.warning ?? "Saved, but something didn't fully apply — check Supabase.");
+      return;
+    }
+
     if (!res.ok) {
       setMessage(typeof data.error === 'string' ? data.error : 'Something went wrong — check your selections.');
       return;

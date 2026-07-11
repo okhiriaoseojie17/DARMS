@@ -36,6 +36,7 @@ export default function NotificationsList({ userId }: { userId: string }) {
   const supabase = createClient();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -66,15 +67,39 @@ export default function NotificationsList({ userId }: { userId: string }) {
 
   // Hard delete — notifications aren't audited/compliance-relevant data the
   // way uploads and courses are, so "clear" means gone, not soft-deleted.
+  //
+  // A delete blocked by RLS doesn't raise an error — it just matches zero
+  // rows silently. .select() lets us see exactly what was deleted, so a
+  // missing migration 0024 shows up as a real message instead of the UI
+  // just removing the item locally while it's still sitting in Supabase.
   async function deleteOne(id: string) {
-    await supabase.from('notifications').delete().eq('id', id);
+    setMessage(null);
+    const { data, error } = await supabase.from('notifications').delete().eq('id', id).select();
+
+    if (error || !data || data.length === 0) {
+      setMessage(
+        "Couldn't delete that notification — this usually means migration 0024_notifications_delete_policy.sql hasn't been run yet."
+      );
+      return;
+    }
+
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }
 
   async function clearAll() {
     if (notifications.length === 0) return;
     if (!window.confirm('Clear all notifications? This can\'t be undone.')) return;
-    await supabase.from('notifications').delete().eq('profile_id', userId);
+
+    setMessage(null);
+    const { data, error } = await supabase.from('notifications').delete().eq('profile_id', userId).select();
+
+    if (error || !data || data.length === 0) {
+      setMessage(
+        "Couldn't clear notifications — this usually means migration 0024_notifications_delete_policy.sql hasn't been run yet."
+      );
+      return;
+    }
+
     setNotifications([]);
   }
 
@@ -104,6 +129,8 @@ export default function NotificationsList({ userId }: { userId: string }) {
       {notifications.length === 0 && (
         <p className="mt-10 text-ink-700/60">Nothing yet — you'll see upload decisions here.</p>
       )}
+
+      {message && <p className="mt-4 text-sm text-red-600">{message}</p>}
 
       <div className="mt-6 flex flex-col gap-2">
         {notifications.map((n) => (
