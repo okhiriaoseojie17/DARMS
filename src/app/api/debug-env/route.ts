@@ -4,10 +4,12 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const key = process.env.GEMINI_API_KEY;
+  const testVar = process.env.TEST_VAR;
   return NextResponse.json({
     hasKey: Boolean(key),
     // Only reveals length + first/last couple chars — enough to confirm
     // it's the right value without exposing the actual key.
     preview: key ? `${key.slice(0, 4)}...${key.slice(-4)} (length ${key.length})` : null,
+    testVarSeen: testVar ?? null,
   });
 }
