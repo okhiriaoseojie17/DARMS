@@ -12,6 +12,11 @@ const generateSchema = z.object({
   questionType: z.enum(["objective", "theory", "mixed"]),
   difficulty: z.enum(["easy", "normal", "hard"]),
   noteUploadId: z.string().uuid().optional(),
+  // Only meaningful when questionType is 'objective' or 'mixed'. Stored
+  // inside the saved content (not a DB column) so the cache-lookup route
+  // doesn't need a migration — the client compares it against the cached
+  // set's stored count before deciding whether to treat it as a match.
+  objectiveCount: z.number().int().min(1).max(30).optional(),
 });
 
 // GET /api/ai/question-bank?courseId=...&sourceCategory=...&questionType=...&difficulty=...&noteUploadId=...
@@ -89,7 +94,7 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { courseId, sourceCategory, questionType, difficulty, noteUploadId } =
+  const { courseId, sourceCategory, questionType, difficulty, noteUploadId, objectiveCount } =
     parsed.data;
 
   if (sourceCategory === "notes" && !noteUploadId) {
@@ -159,13 +164,14 @@ export async function POST(req: NextRequest) {
     sourceCategory,
     questionType,
     difficulty,
+    objectiveCount,
   });
 
   let content: unknown;
   try {
     const raw = await generateWithGemini(
       [{ text: instructionPrompt }, ...fileParts],
-      { responseFormat: "json" }
+      { responseFormat: "json", thinkingBudget: 0 }
     );
     content = JSON.parse(raw);
   } catch (err) {
@@ -180,6 +186,11 @@ export async function POST(req: NextRequest) {
 
   const sourceUploadIds = uploads.map((u) => u.id);
 
+  const contentWithMeta =
+    content && typeof content === "object"
+      ? { ...(content as Record<string, unknown>), meta: { objectiveCount: objectiveCount ?? null } }
+      : content;
+
   const { data: saved, error: saveError } = await supabase
     .from("question_banks")
     .insert({
@@ -188,7 +199,7 @@ export async function POST(req: NextRequest) {
       source_category: sourceCategory,
       difficulty,
       question_type: questionType,
-      content,
+      content: contentWithMeta,
       generated_by: user.id,
     })
     .select()

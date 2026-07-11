@@ -6,11 +6,11 @@
 import type { GeminiPart } from "./fetchUploadContent";
 
 // gemini-1.5-flash and the entire 1.x family are retired (shut down by
-// Google in mid-2026). Using the auto-updating "flash-latest" alias rather
-// than a pinned version number, so this doesn't silently break again next
-// time Google rotates which model is current — as of writing, this alias
-// points to gemini-3.5-flash.
-const GEMINI_MODEL = "gemini-flash-latest";
+// Google in mid-2026). Using flash-lite here rather than the full flash
+// model — quiz generation from a document is a structured, format-
+// constrained task that doesn't need the extra reasoning depth, and
+// flash-lite responds noticeably faster on the free tier.
+const GEMINI_MODEL = "gemini-flash-lite-latest";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 export class GeminiError extends Error {
@@ -24,6 +24,12 @@ interface GenerateOptions {
   // 'json' forces structured output (used by quiz generation).
   // 'text' returns a plain conversational answer (used by ask mode).
   responseFormat?: "json" | "text";
+  // Gemini 3.x models do an internal reasoning pass before responding by
+  // default, which adds latency. For a structured, format-constrained task
+  // like quiz generation, that reasoning buys little — set to 0 to skip it
+  // and get a noticeably faster response. Left undefined (default behavior)
+  // for cases where reasoning quality actually matters, like "ask" mode.
+  thinkingBudget?: number;
 }
 
 export async function generateWithGemini(
@@ -35,7 +41,7 @@ export async function generateWithGemini(
     throw new GeminiError("GEMINI_API_KEY is not set");
   }
 
-  const { responseFormat = "json" } = options;
+  const { responseFormat = "json", thinkingBudget } = options;
 
   const response = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
     method: "POST",
@@ -45,6 +51,7 @@ export async function generateWithGemini(
       generationConfig: {
         temperature: 0.7,
         ...(responseFormat === "json" ? { responseMimeType: "application/json" } : {}),
+        ...(thinkingBudget !== undefined ? { thinkingConfig: { thinkingBudget } } : {}),
       },
     }),
   });

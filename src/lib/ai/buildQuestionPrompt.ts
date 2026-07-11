@@ -10,6 +10,7 @@ interface BuildQuizPromptArgs {
   sourceCategory: SourceCategory;
   questionType: QuestionType;
   difficulty: Difficulty;
+  objectiveCount?: number;
 }
 
 const DIFFICULTY_INSTRUCTIONS: Record<Difficulty, string> = {
@@ -31,17 +32,17 @@ const DIFFICULTY_INSTRUCTIONS: Record<Difficulty, string> = {
     "every question must still be clearly relevant to the topic at hand.",
 };
 
-const FORMAT_INSTRUCTIONS: Record<QuestionType, string> = {
-  objective:
-    "Produce only objective (multiple-choice) questions, each with exactly " +
-    "one correct answer and three plausible distractors.",
-  theory:
-    "Produce only theory/essay-style questions requiring a written answer, " +
-    "with a model answer provided for each.",
-  mixed:
-    "Produce a mix of objective (multiple-choice) and theory questions, " +
-    "roughly balanced.",
-};
+function formatInstructions(questionType: QuestionType, objectiveCount?: number): string {
+  const countPhrase = objectiveCount ? `exactly ${objectiveCount}` : "a reasonable number of";
+
+  if (questionType === "objective") {
+    return `Produce ${countPhrase} objective (multiple-choice) questions, each with exactly one correct answer and three plausible distractors.`;
+  }
+  if (questionType === "theory") {
+    return "Produce only theory/essay-style questions requiring a written answer, with a model answer provided for each.";
+  }
+  return `Produce a mix of objective and theory questions: ${countPhrase} objective (multiple-choice, each with one correct answer and three distractors), plus a reasonable number of theory questions alongside them.`;
+}
 
 function categoryLabel(sourceCategory: SourceCategory): string {
   if (sourceCategory === "notes") return "study notes";
@@ -58,12 +59,13 @@ export function buildQuestionPrompt({
   sourceCategory,
   questionType,
   difficulty,
+  objectiveCount,
 }: BuildQuizPromptArgs): string {
   return `You are generating a practice question set for university students in the course ${courseCode} — ${courseTitle}.
 
 The document(s) attached to this request are ${categoryLabel(sourceCategory)} previously used in this course. Base the new question set on the structure, topics, and style of this material.
 
-${FORMAT_INSTRUCTIONS[questionType]}
+${formatInstructions(questionType, objectiveCount)}
 
 ${DIFFICULTY_INSTRUCTIONS[difficulty]}
 

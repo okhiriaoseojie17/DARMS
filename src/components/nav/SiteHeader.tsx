@@ -40,6 +40,9 @@ export async function SiteHeader() {
         </Link>
 
         <nav className="flex items-center gap-6 text-sm text-paper-50">
+          <Link href="/creator/about" className="hover:text-amber-500">
+            Meet the Creator
+          </Link>
           <Link href="/search" className="hover:text-amber-500">
             Search
           </Link>

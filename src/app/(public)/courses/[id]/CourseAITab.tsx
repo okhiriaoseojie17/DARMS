@@ -47,6 +47,7 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
   const [noteUploadId, setNoteUploadId] = useState('');
   const [questionType, setQuestionType] = useState<QuestionType>('mixed');
   const [difficulty, setDifficulty] = useState<Difficulty>('normal');
+  const [objectiveCount, setObjectiveCount] = useState(10);
   const [question, setQuestion] = useState('');
 
   const [loading, setLoading] = useState(false);
@@ -77,6 +78,7 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
     }
 
     let cancelled = false;
+    const countRelevant = questionType === 'objective' || questionType === 'mixed';
 
     async function checkCache() {
       setCheckingCache(true);
@@ -94,7 +96,10 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
         const data = await res.json();
         if (cancelled) return;
 
-        if (res.ok && data.questionBank) {
+        const cachedMeta = data.questionBank?.content?.meta;
+        const countMatches = !countRelevant || cachedMeta?.objectiveCount === objectiveCount;
+
+        if (res.ok && data.questionBank && countMatches) {
           setQuiz(data.questionBank.content.questions as QuizQuestion[]);
           setFromCache(true);
           setGeneratedAt(data.questionBank.generated_at as string);
@@ -122,7 +127,7 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, category, noteUploadId, questionType, difficulty, selectionReady]);
+  }, [mode, category, noteUploadId, questionType, difficulty, objectiveCount, selectionReady]);
 
   if (!isSignedIn) {
     return (
@@ -158,6 +163,8 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
           questionType,
           difficulty,
           noteUploadId: category === 'notes' ? noteUploadId : undefined,
+          objectiveCount:
+            questionType === 'objective' || questionType === 'mixed' ? objectiveCount : undefined,
         }),
       });
       const data = await res.json();
@@ -316,6 +323,23 @@ export function CourseAITab({ courseId, courseCode, isSignedIn, availability }: 
               ))}
             </div>
           </div>
+
+          {(questionType === 'objective' || questionType === 'mixed') && (
+            <label className="flex flex-col gap-1 text-sm">
+              Number of objective questions
+              <select
+                value={objectiveCount}
+                onChange={(e) => setObjectiveCount(Number(e.target.value))}
+                className="w-32 rounded-sm border border-paper-200/20 bg-transparent px-4 py-3 text-paper-100"
+              >
+                {[5, 10, 15, 20, 25, 30].map((n) => (
+                  <option key={n} value={n} className="text-ink-950">
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <div>
             <p className="text-xs uppercase tracking-wide text-paper-200/40">Difficulty</p>
