@@ -39,11 +39,24 @@ export const createUploadSchema = z
     if (val.fileType !== 'link' && !val.storagePath) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'storagePath is required once the file has been uploaded', path: ['storagePath'] });
     }
+    if (val.fileType !== 'link' && val.fileSizeBytes && val.fileSizeBytes > MAX_FILE_SIZE_BYTES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `File exceeds the ${MAX_FILE_SIZE_MB}MB limit`,
+        path: ['fileSizeBytes'],
+      });
+    }
   });
 
 export type CreateUploadInput = z.infer<typeof createUploadSchema>;
 
-export const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
+// Configurable via env so the cap can be tuned without a redeploy of logic —
+// just update NEXT_PUBLIC_MAX_UPLOAD_MB in Vercel and both client and server
+// pick it up. NEXT_PUBLIC_ prefix is required since UploadForm.tsx (a client
+// component) reads this too. Falls back to 8MB if unset.
+export const MAX_FILE_SIZE_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB ?? 8);
+export const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+
 export const ALLOWED_MIME_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -51,6 +64,8 @@ export const ALLOWED_MIME_TYPES = [
   'image/png',
   'image/jpeg',
 ];
+
+export const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg'];
 
 export const MIME_TO_FILE_TYPE: Record<string, 'pdf' | 'docx' | 'pptx' | 'image'> = {
   'application/pdf': 'pdf',

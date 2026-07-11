@@ -1,8 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import imageCompression from 'browser-image-compression';
 import { createClient } from '@/lib/supabase/client';
-import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES, MIME_TO_FILE_TYPE } from '@/lib/validation/upload';
+import {
+  ALLOWED_MIME_TYPES,
+  IMAGE_MIME_TYPES,
+  MAX_FILE_SIZE_BYTES,
+  MAX_FILE_SIZE_MB,
+  MIME_TO_FILE_TYPE,
+} from '@/lib/validation/upload';
 import { BackLink } from '@/components/nav/BackLink';
 import { displaySemester } from '@/lib/semester';
 
@@ -12,6 +19,11 @@ interface UploadFormProps {
   hideHeader?: boolean;
   onRequestCourse?: () => void;
 }
+
+// Target for compressed images — deliberately well under MAX_FILE_SIZE_BYTES
+// so a compressed image essentially never gets rejected by the size check
+// that runs afterward.
+const IMAGE_COMPRESSION_TARGET_MB = 2;
 
 export default function UploadForm({
   hideHeader = false,
@@ -30,6 +42,7 @@ export default function UploadForm({
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
@@ -68,6 +81,51 @@ export default function UploadForm({
     setCourseSearch('');
   }
 
+  // Runs the moment a file is picked, not at submit time, so the person sees
+  // "compressing…" feedback right away and the size check that follows in
+  // handleSubmit already sees the compressed file.
+  async function handleFileChange(picked: File | null) {
+    setMessage(null);
+    if (!picked) {
+      setFile(null);
+      return;
+    }
+
+    if (!IMAGE_MIME_TYPES.includes(picked.type)) {
+      setFile(picked);
+      return;
+    }
+
+    setCompressing(true);
+    try {
+      const compressed = await imageCompression(picked, {
+        maxSizeMB: IMAGE_COMPRESSION_TARGET_MB,
+        maxWidthOrHeight: 2200,
+        useWebWorker: true,
+        // Preserve the original mime type (png stays png, jpg stays jpg)
+        // rather than the library's default of converting everything to jpeg.
+        fileType: picked.type,
+      });
+
+      // imageCompression returns a Blob — rewrap as a File so downstream
+      // code (name, type) keeps working exactly like a picked file.
+      const recompressedFile = new File([compressed], picked.name, {
+        type: picked.type,
+        lastModified: Date.now(),
+      });
+
+      setFile(recompressedFile);
+    } catch (err) {
+      // If compression fails for any reason, fall back to the original file
+      // rather than blocking the upload entirely — the size check below
+      // will still catch anything too large.
+      console.error('Image compression failed, using original file:', err);
+      setFile(picked);
+    } finally {
+      setCompressing(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setMessage(null);
@@ -89,7 +147,12 @@ export default function UploadForm({
       return;
     }
     if (!isLink && file && file.size > MAX_FILE_SIZE_BYTES) {
-      setMessage('File is too large (25MB max).');
+      const isImage = IMAGE_MIME_TYPES.includes(file.type);
+      setMessage(
+        isImage
+          ? `Image is still too large after compression (${MAX_FILE_SIZE_MB}MB max). Try a smaller photo.`
+          : `File is too large (${MAX_FILE_SIZE_MB}MB max). Try re-exporting at a lower quality or splitting it into parts.`
+      );
       return;
     }
 
@@ -310,13 +373,16 @@ export default function UploadForm({
           </label>
         ) : (
           <label className="flex flex-col gap-1 text-sm">
-            File (PDF, DOCX, PPTX, or image — 25MB max)
+            File (PDF, DOCX, PPTX, or image — {MAX_FILE_SIZE_MB}MB max)
             <input
               type="file"
               accept=".pdf,.docx,.pptx,.png,.jpg,.jpeg"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
               className="rounded-sm border border-ink-700/20 px-4 py-3"
             />
+            {compressing && (
+              <span className="text-xs text-ink-700/60">Compressing image…</span>
+            )}
           </label>
         )}
 
@@ -324,10 +390,10 @@ export default function UploadForm({
 
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || compressing}
           className="rounded-sm bg-ink-950 px-4 py-3 text-sm font-medium text-paper-50 hover:bg-ink-900 disabled:opacity-40"
         >
-          {submitting ? 'Uploading…' : 'Submit'}
+          {submitting ? 'Uploading…' : compressing ? 'Compressing…' : 'Submit'}
         </button>
       </form>
     </div>

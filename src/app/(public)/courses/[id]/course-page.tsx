@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { displaySemester } from '@/lib/semester';
+import { CourseAITab } from './CourseAITab';
 
 // Resource lists change often enough (new uploads, deletions) that caching
 // isn't worth the staleness — without this, Next.js may serve a cached
@@ -22,6 +23,12 @@ const CATEGORIES = [
 
 export default async function CourseDetailPage({ params }: { params: { id: string } }) {
   const supabase = await createClient();
+
+  // Signed-in check happens here (server-side), not inside the AI tab
+  // component — same pattern as the rest of the app: the server page decides
+  // who's allowed, the client component just renders based on what it's given.
+  const { data: userData } = await supabase.auth.getUser();
+  const userId = userData?.user?.id ?? null;
 
   // RLS's "courses_public_read_approved" policy already ensures a signed-out
   // visitor can only ever get this row back if status = 'approved'.
@@ -52,6 +59,19 @@ export default async function CourseDetailPage({ params }: { params: { id: strin
     ...cat,
     uploads: (uploads ?? []).filter((u: any) => u.resource_type === cat.key),
   }));
+
+  // What the AI tab needs to know: which categories actually have approved
+  // material to generate from (no point letting someone pick "Exam" if there
+  // are zero approved exams), and the note titles for the notes dropdown.
+  const aiAvailability = {
+    test1: grouped.find((g) => g.key === 'test1')!.uploads.length > 0,
+    test2: grouped.find((g) => g.key === 'test2')!.uploads.length > 0,
+    exam: grouped.find((g) => g.key === 'exam')!.uploads.length > 0,
+    notes: (grouped.find((g) => g.key === 'notes')!.uploads as any[]).map((u) => ({
+      id: u.id,
+      label: u.display_label ?? u.generated_filename,
+    })),
+  };
 
   return (
     <main className="min-h-screen bg-ink-950 px-6 py-16 text-paper-50">
@@ -112,6 +132,16 @@ export default async function CourseDetailPage({ params }: { params: { id: strin
               )}
             </section>
           ))}
+
+          <section>
+            <h2 className="font-display text-lg font-semibold text-paper-100">AI Study Help</h2>
+            <CourseAITab
+              courseId={course.id}
+              courseCode={course.code}
+              isSignedIn={Boolean(userId)}
+              availability={aiAvailability}
+            />
+          </section>
         </div>
       </div>
     </main>
