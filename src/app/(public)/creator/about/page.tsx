@@ -88,8 +88,7 @@ export default function AboutCreatorPage() {
         <h3 className="mb-4 text-lg font-semibold text-ink-950">Why DARMS?</h3>
         <div className="space-y-4 rounded-lg border border-paper-200 bg-paper-100 p-6 text-ink-700/80">
           <p>
-            Every semester, thousands of academic resources are scattered across WhatsApp
-            groups, Telegram channels, Google Drive folders and personal devices. Students
+            Every semester, thousands of academic resources are scattered across Telegram groups, Google Drive folders and personal devices. Students
             repeatedly ask the same questions:
           </p>
           <p className="italic text-ink-950">
@@ -98,6 +97,8 @@ export default function AboutCreatorPage() {
             &ldquo;Can someone send last year&apos;s exam?&rdquo;
             <br />
             &ldquo;Who has the lecture slides?&rdquo;
+            <br />
+            &ldquo;Can I have quick AI quizzes as I&apos;m reading?&rdquo;
           </p>
           <p>
             Valuable academic materials become lost simply because there is no structured
