@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { BackLink } from '@/components/nav/BackLink';
+import { displaySemester } from '@/lib/semester';
 
 type CourseRequest = {
   id: string;
@@ -158,7 +159,7 @@ export default function CourseRequestQueue({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-mono text-xs text-ink-700">
-                  {req.departments?.name} · {req.levels?.name} · {req.semester} Semester
+                  {req.departments?.name} · {req.levels?.name} · {displaySemester(req.semester)} Semester
                 </p>
                 <p className="mt-1 font-display text-lg">
                   {req.code} — {req.title}

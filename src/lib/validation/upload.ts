@@ -4,8 +4,13 @@ export const resourceTypeSchema = z.enum(['notes', 'test1', 'test2', 'assignment
 export const fileTypeSchema = z.enum(['pdf', 'docx', 'pptx', 'image', 'link']);
 
 // What the client is allowed to send when creating an upload. Notice there is
-// no `generated_filename` or `status` field here — both are computed/enforced
-// server-side (naming service + the DB trigger), never trusted from the client.
+// no `generated_filename`, `status`, or `semester` field here — semester is
+// no longer asked for at upload time at all, since a course is permanently
+// tied to one semester at creation (a course code can't exist in both
+// Alpha and Omega). The API route reads semester off the course row itself
+// rather than trusting a second value from the client, so the two can never
+// disagree. `generated_filename`/`status` remain computed/enforced server-side
+// (naming service + the DB trigger) for the same reason.
 //
 // For fileType === 'link': externalUrl is required, storagePath/fileSizeBytes
 // are omitted.
@@ -21,7 +26,6 @@ export const createUploadSchema = z
     academicYear: z
       .string()
       .regex(/^\d{4}\/\d{4}$/, 'Academic year must look like 2024/2025'),
-    semester: z.enum(['First', 'Second']),
     externalUrl: z.string().url().optional(),
     storagePath: z.string().min(1).optional(),
     fileSizeBytes: z.number().int().positive().optional(),

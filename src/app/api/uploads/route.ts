@@ -48,9 +48,13 @@ export async function POST(request: NextRequest) {
 
   const input = parsed.data;
 
+  // `semester` is read off the course row, not the client — a course is
+  // permanently tied to one semester at creation (a course code can't exist
+  // in both Alpha and Omega), so asking the uploader again would just be a
+  // second value that could disagree with the first.
   const { data: course, error: courseError } = await supabase
     .from('courses')
-    .select('id, code, department_id, level_id')
+    .select('id, code, department_id, level_id, semester')
     .eq('id', input.courseId)
     .single();
 
@@ -72,8 +76,7 @@ export async function POST(request: NextRequest) {
   //
   // `resource_type` IS persisted (migration 0022) — this is what the course
   // page groups by into Test 1 / Test 2 / Exam / Notes / Assignments /
-  // Others folders. Previously this was computed for the filename and then
-  // silently dropped, leaving no reliable column to group on.
+  // Others folders.
   const { data, error } = await supabase
     .from('uploads')
     .insert({
@@ -81,7 +84,7 @@ export async function POST(request: NextRequest) {
       course_id: course.id,
       department_id: course.department_id,
       level_id: course.level_id,
-      semester: input.semester,
+      semester: course.semester,
       academic_year: input.academicYear,
       file_type: input.fileType,
       resource_type: input.resourceType,

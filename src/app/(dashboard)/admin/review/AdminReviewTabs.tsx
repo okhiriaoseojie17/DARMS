@@ -5,12 +5,15 @@ import { useSearchParams } from 'next/navigation';
 import { BackLink } from '@/components/nav/BackLink';
 import ReviewQueue from './ReviewQueue';
 import CourseRequestQueue from '../courses/CourseRequestQueue';
+import ManageUploads from './ManageUploads';
 
-type Tab = 'review' | 'courses';
+type Tab = 'review' | 'courses' | 'manage';
 
 export default function AdminReviewTabs({ userId }: { userId: string }) {
   const searchParams = useSearchParams();
-  const initialTab: Tab = searchParams.get('tab') === 'courses' ? 'courses' : 'review';
+  const initialTabParam = searchParams.get('tab');
+  const initialTab: Tab =
+    initialTabParam === 'courses' ? 'courses' : initialTabParam === 'manage' ? 'manage' : 'review';
   const [tab, setTab] = useState<Tab>(initialTab);
 
   return (
@@ -36,14 +39,21 @@ export default function AdminReviewTabs({ userId }: { userId: string }) {
         >
           Course requests
         </button>
+        <button
+          type="button"
+          onClick={() => setTab('manage')}
+          className={`flex-1 rounded-sm px-4 py-2 text-sm font-medium transition-colors ${
+            tab === 'manage' ? 'bg-ink-950 text-paper-50' : 'text-ink-700 hover:bg-ink-700/5'
+          }`}
+        >
+          Manage uploads
+        </button>
       </div>
 
       <div className="mt-8">
-        {tab === 'review' ? (
-          <ReviewQueue userId={userId} hideHeader />
-        ) : (
-          <CourseRequestQueue userId={userId} hideHeader />
-        )}
+        {tab === 'review' && <ReviewQueue userId={userId} hideHeader />}
+        {tab === 'courses' && <CourseRequestQueue userId={userId} hideHeader />}
+        {tab === 'manage' && <ManageUploads userId={userId} />}
       </div>
     </div>
   );

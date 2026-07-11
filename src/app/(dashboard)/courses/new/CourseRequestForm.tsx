@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { BackLink } from '@/components/nav/BackLink';
+import { displaySemester } from '@/lib/semester';
 
 type Department = { id: string; name: string; code: string };
 type Level = { id: string; name: string };
@@ -16,16 +17,14 @@ type CourseRequest = {
   created_at: string;
 };
 
-// 1. Define the props types your component receives
 interface CourseRequestFormProps {
   hideHeader?: boolean;
   onBackToUpload?: () => void;
 }
 
-// 2. Accept and destructure the props here
-export default function CourseRequestForm({ 
-  hideHeader = false, 
-  onBackToUpload 
+export default function CourseRequestForm({
+  hideHeader = false,
+  onBackToUpload,
 }: CourseRequestFormProps) {
   const supabase = createClient();
   const searchParams = useSearchParams();
@@ -104,7 +103,6 @@ export default function CourseRequestForm({
           A department administrator will review it. You'll be able to upload
           to this course once it's approved.
         </p>
-        {/* 3. Handle the alternate back button click if prop is supplied */}
         {onBackToUpload ? (
           <button
             onClick={onBackToUpload}
@@ -133,7 +131,6 @@ export default function CourseRequestForm({
 
   return (
     <div className="text-ink-950">
-      {/* 4. Hide header text and traditional back links if hideHeader is active */}
       {!hideHeader && (
         <>
           <BackLink fallbackHref={returnTo ?? '/'} label={returnTo ? 'Back to upload' : 'Back'} />
@@ -145,7 +142,6 @@ export default function CourseRequestForm({
         </>
       )}
 
-      {/* If header is hidden, adjust margins accordingly (e.g. mt-2 instead of mt-8) */}
       <form onSubmit={handleSubmit} className={`${hideHeader ? 'mt-2' : 'mt-8'} flex flex-col gap-4`}>
         <label className="flex flex-col gap-1 text-sm">
           Department
@@ -214,8 +210,8 @@ export default function CourseRequestForm({
             onChange={(e) => setSemester(e.target.value as 'First' | 'Second')}
             className="rounded-sm border border-ink-700/20 px-4 py-3"
           >
-            <option value="First">First</option>
-            <option value="Second">Second</option>
+            <option value="First">{displaySemester('First')}</option>
+            <option value="Second">{displaySemester('Second')}</option>
           </select>
         </label>
 

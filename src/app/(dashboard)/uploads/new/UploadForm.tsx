@@ -4,16 +4,19 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES, MIME_TO_FILE_TYPE } from '@/lib/validation/upload';
 import { BackLink } from '@/components/nav/BackLink';
+import { displaySemester } from '@/lib/semester';
 
-type Course = { id: string; code: string; title: string };
+type Course = { id: string; code: string; title: string; semester: string };
+
+interface UploadFormProps {
+  hideHeader?: boolean;
+  onRequestCourse?: () => void;
+}
 
 export default function UploadForm({
   hideHeader = false,
   onRequestCourse,
-}: {
-  hideHeader?: boolean;
-  onRequestCourse?: () => void;
-} = {}) {
+}: UploadFormProps) {
   const supabase = createClient();
   const [loading, setLoading] = useState(true);
   const [courses, setCourses] = useState<Course[]>([]);
@@ -22,7 +25,6 @@ export default function UploadForm({
   const [resourceType, setResourceType] = useState<'notes' | 'test1' | 'test2' | 'assignment' | 'exam' | 'other'>('notes');
   const [label, setLabel] = useState('');
   const [academicYear, setAcademicYear] = useState('2024/2025');
-  const [semester, setSemester] = useState<'First' | 'Second'>('First');
   const [isLink, setIsLink] = useState(false);
   const [externalUrl, setExternalUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -34,7 +36,7 @@ export default function UploadForm({
     async function init() {
       const { data } = await supabase
         .from('courses')
-        .select('id, code, title')
+        .select('id, code, title, semester')
         .eq('status', 'approved')
         .order('code');
       setCourses(data ?? []);
@@ -48,6 +50,8 @@ export default function UploadForm({
       c.code.toLowerCase().includes(courseSearch.toLowerCase()) ||
       c.title.toLowerCase().includes(courseSearch.toLowerCase())
   );
+
+  const selectedCourse = courses.find((c) => c.id === courseId) ?? null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -100,6 +104,8 @@ export default function UploadForm({
       fileType = MIME_TO_FILE_TYPE[file.type];
     }
 
+    // No semester field here — the selected course already has one fixed
+    // at creation, and the API reads it off the course row directly.
     const res = await fetch('/api/uploads', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -109,7 +115,6 @@ export default function UploadForm({
         resourceType,
         label: label || undefined,
         academicYear,
-        semester,
         externalUrl: isLink ? externalUrl : undefined,
         storagePath,
         fileSizeBytes,
@@ -202,6 +207,13 @@ export default function UploadForm({
           </select>
         </label>
 
+        {selectedCourse && (
+          <p className="-mt-2 text-xs text-ink-700/60">
+            {selectedCourse.code} is an {displaySemester(selectedCourse.semester)} Semester course —
+            this upload will be filed under that semester automatically.
+          </p>
+        )}
+
         <label className="flex flex-col gap-1 text-sm">
           Resource type
           <select
@@ -228,28 +240,15 @@ export default function UploadForm({
           />
         </label>
 
-        <div className="flex gap-4">
-          <label className="flex flex-1 flex-col gap-1 text-sm">
-            Academic year
-            <input
-              value={academicYear}
-              onChange={(e) => setAcademicYear(e.target.value)}
-              placeholder="2024/2025"
-              className="rounded-sm border border-ink-700/20 px-4 py-3"
-            />
-          </label>
-          <label className="flex flex-1 flex-col gap-1 text-sm">
-            Semester
-            <select
-              value={semester}
-              onChange={(e) => setSemester(e.target.value as 'First' | 'Second')}
-              className="rounded-sm border border-ink-700/20 px-4 py-3"
-            >
-              <option value="First">First</option>
-              <option value="Second">Second</option>
-            </select>
-          </label>
-        </div>
+        <label className="flex flex-col gap-1 text-sm">
+          Academic year
+          <input
+            value={academicYear}
+            onChange={(e) => setAcademicYear(e.target.value)}
+            placeholder="2024/2025"
+            className="rounded-sm border border-ink-700/20 px-4 py-3"
+          />
+        </label>
 
         <div className="flex items-center gap-2 text-sm">
           <input

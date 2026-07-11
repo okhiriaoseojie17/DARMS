@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { BackLink } from '@/components/nav/BackLink';
+import { displaySemester } from '@/lib/semester';
 
 type PendingUpload = {
   id: string;
@@ -168,7 +169,7 @@ export default function ReviewQueue({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="font-mono text-xs text-ink-700">
-                  {upload.courses?.code} · {upload.academic_year} · {upload.semester} Semester
+                  {upload.courses?.code} · {upload.academic_year} · {displaySemester(upload.semester)} Semester
                 </p>
                 <p className="mt-1 font-display text-lg">{upload.generated_filename}</p>
                 <p className="mt-1 text-sm text-ink-700">

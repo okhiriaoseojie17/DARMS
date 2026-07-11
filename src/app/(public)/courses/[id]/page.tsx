@@ -1,6 +1,12 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { displaySemester } from '@/lib/semester';
+
+// Resource lists change often enough (new uploads, deletions) that caching
+// isn't worth the staleness — without this, Next.js may serve a cached
+// version of this page's data even after an upload is deleted or approved.
+export const dynamic = 'force-dynamic';
 
 // Fixed order, always rendered — a category with zero uploads still shows
 // its own "Nothing here yet" section rather than disappearing, so the
@@ -57,7 +63,7 @@ export default async function CourseDetailPage({ params }: { params: { id: strin
           &larr; {course.departments?.name}
         </Link>
         <p className="mt-4 font-mono text-xs text-amber-500">
-          {course.code} · Level {course.levels?.name} · {course.semester} Semester
+          {course.code} · Level {course.levels?.name} · {displaySemester(course.semester)} Semester
         </p>
         <h1 className="font-display text-3xl font-semibold">{course.title}</h1>
 
@@ -92,7 +98,7 @@ export default async function CourseDetailPage({ params }: { params: { id: strin
                       >
                         <div>
                           <p className="font-mono text-xs text-paper-200/50">
-                            {upload.academic_year} · {upload.semester} Semester
+                            {upload.academic_year} · {displaySemester(upload.semester)} Semester
                           </p>
                           <p className="mt-1 font-display text-base">{upload.generated_filename}</p>
                         </div>
