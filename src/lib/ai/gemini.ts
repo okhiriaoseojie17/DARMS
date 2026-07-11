@@ -5,7 +5,12 @@
 // images natively (no separate OCR step needed).
 import type { GeminiPart } from "./fetchUploadContent";
 
-const GEMINI_MODEL = "gemini-1.5-flash";
+// gemini-1.5-flash and the entire 1.x family are retired (shut down by
+// Google in mid-2026). Using the auto-updating "flash-latest" alias rather
+// than a pinned version number, so this doesn't silently break again next
+// time Google rotates which model is current — as of writing, this alias
+// points to gemini-3.5-flash.
+const GEMINI_MODEL = "gemini-flash-latest";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 export class GeminiError extends Error {
